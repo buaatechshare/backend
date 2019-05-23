@@ -43,8 +43,6 @@ class UserViewSet(CreateModelMixin,
 
 
 class MessageViewSet(CreateModelMixin,
-                     #RetrieveModelMixin,
-                     #ListModelMixin,
                      viewsets.GenericViewSet):
     """
     站内信
@@ -56,8 +54,15 @@ class MessageViewSet(CreateModelMixin,
     def get(self,request):
         senderID = request.query_params.get('senderID')
         receiverID = request.query_params.get('receiverID')
-        queryset = Message.objects.filter(senderID=senderID,receiverID=receiverID)
-        serializer = self.get_serializer(queryset, many=True)
+        if senderID and receiverID:
+            queryset = Message.objects.filter(senderID=senderID,receiverID=receiverID)
+        elif senderID:
+            queryset = Message.objects.filter(senderID=senderID)
+        elif receiverID:
+            queryset = Message.objects.filter(receiverID=receiverID)
+        else:
+            queryset = Message.objects.all()
+        serializer = self.get_serializer(queryset,many=True)
         return Response(serializer.data)
 
 class FollowViewSet(CreateModelMixin,
