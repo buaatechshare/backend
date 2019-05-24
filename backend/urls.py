@@ -17,6 +17,7 @@ from django.contrib import admin
 from django.urls import path,include
 from rest_framework_jwt.views import obtain_jwt_token
 from rest_framework.routers import DefaultRouter
+from rest_framework.documentation import include_docs_urls
 
 from users.views import UserViewSet,MessageViewSet
 
@@ -33,5 +34,7 @@ urlpatterns = [
     #用户登录
     path('login/', obtain_jwt_token),
     #router注册的url
-    path('',include(router.urls))
+    path('',include(router.urls)),
+    #drf自带文档管理
+    path('docs/',include_docs_urls(title='backend'))
 ]

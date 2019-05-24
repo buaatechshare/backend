@@ -10,6 +10,16 @@ from rest_framework.validators import UniqueValidator
 # my-own packages
 from .models import UserProfile,Message,Follow
 
+class UserDetailSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = UserProfile
+        fields = ('name','phone','email','user_add_time')
+
+class UserUpdateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = UserProfile
+        fields = ('name','password')
+
 class UserRegSerializer(serializers.ModelSerializer):
     name = serializers.CharField(label='用户名',required=True,allow_blank=False)
     password = serializers.CharField(
