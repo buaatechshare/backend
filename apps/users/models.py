@@ -99,6 +99,26 @@ class Message(models.Model):
     def __str__(self):
         return self.messageID
 
+class ExpertCheckForm(models.Model):
+    formID = models.AutoField(primary_key=True,verbose_name='专家认证申请表单编号')
+    userID = models.ForeignKey(UserProfile,to_field='userID',on_delete=models.CASCADE,verbose_name='用户ID')
+    isPass = models.BooleanField(default=False,verbose_name='是否通过')
+    isCheck = models.BooleanField(default=False,verbose_name='是否被审核过')
+    reason = models.TextField(verbose_name='管理员意见')
+    adminID = models.IntegerField(null=True,verbose_name='管理员ID')
+    intro = models.TextField(verbose_name='个人简介')
+    constitution = models.CharField(max_length=255,verbose_name='所在机构')
+    realName = models.CharField(max_length=255,verbose_name='真实姓名')
+    add_time = models.DateTimeField(default=datetime.now,verbose_name='申请时间')
+
+    class Meta:
+        verbose_name = '专家认证申请表单'
+        verbose_name_plural = verbose_name
+
+    def __str__(self):
+        return self.formID
+
+
 # class Admin(AbstractUser):
 #     """
 #     系统管理员(管理员信息表)

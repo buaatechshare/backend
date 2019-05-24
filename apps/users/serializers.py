@@ -8,7 +8,7 @@ from rest_framework.validators import UniqueValidator
 # third-party packges
 
 # my-own packages
-from .models import UserProfile,Message,Follow
+from .models import UserProfile,Message,Follow,ExpertCheckForm,ExpertProfile
 
 class UserDetailSerializer(serializers.ModelSerializer):
     class Meta:
@@ -51,9 +51,26 @@ class MessageSerializer(serializers.ModelSerializer):
         model = Message
         fields = ('senderID','receiverID','content','add_time')
 
+class ExpertSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ExpertProfile
+        fields = ('user','intro','constitution','realName')
+
 class FollowSerializer(serializers.ModelSerializer):
     add_time = serializers.DateTimeField(read_only=True)
-
+    followID = ExpertSerializer()
     class Meta:
         model = Follow
+        fields = '__all__'
+
+class ExpertApplySerializer(serializers.ModelSerializer):
+    formID = serializers.IntegerField(read_only=True)
+
+    class Meta:
+        model = ExpertCheckForm
+        fields = ('formID','userID','intro','constitution','realName')
+
+class ExpertCheckSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ExpertCheckForm
         fields = '__all__'
