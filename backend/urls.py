@@ -20,18 +20,23 @@ from rest_framework.routers import DefaultRouter
 from rest_framework.documentation import include_docs_urls
 
 from users.views import UserViewSet,MessageViewSet,ExpertCheckViewSet,FollowViewSet
+from resources.views import CommentViewSet
+
 router = DefaultRouter()
 #用户注册register
-router.register('users',UserViewSet,base_name='users')
+router.register('userinfo',UserViewSet,base_name='users')
 
 #站内信
 router.register('messages',MessageViewSet,base_name='messages')
 
 #专家认证申请表单
-router.register('applications',ExpertCheckViewSet,base_name='applications')
+router.register('application',ExpertCheckViewSet,base_name='applications')
 
 #用户关注
 router.register('follow',FollowViewSet,base_name='follow')
+
+#用户对资源评论
+router.register('comment',CommentViewSet,base_name='comment')
 
 urlpatterns = [
     path('admin/', admin.site.urls),

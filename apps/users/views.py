@@ -5,17 +5,24 @@ from datetime import datetime
 from rest_framework.mixins import CreateModelMixin,RetrieveModelMixin,ListModelMixin,UpdateModelMixin,DestroyModelMixin
 from rest_framework import viewsets,status
 from rest_framework.response import Response
-from django.shortcuts import get_object_or_404
+from rest_framework.pagination import PageNumberPagination
 
 # third-party packges
 from rest_framework_jwt.serializers import jwt_encode_handler, jwt_payload_handler
 
 # my-own packages
-from .serializers import UserRegSerializer,MessageSerializer,FollowSerializer,UserDetailSerializer,UserUpdateSerializer
+from .serializers import UserRegSerializer,MessageGetSerializer,MessagePostSerializer,FollowGetSerializer,FollowPostSerializer,UserDetailSerializer,UserUpdateSerializer
 from .serializers import ExpertApplySerializer,ExpertCheckSerializer
 from .models import UserProfile,Message,Follow,ExpertCheckForm,ExpertProfile
 
 # Create your views here.
+
+#pagination class
+class StandardResultsSetPagination(PageNumberPagination):
+    page_size = 10
+    page_size_query_param = 'pageSize'
+    max_page_size = 100
+
 
 class UserViewSet(CreateModelMixin,
                   RetrieveModelMixin,
@@ -60,15 +67,22 @@ class UserViewSet(CreateModelMixin,
 
 
 class MessageViewSet(CreateModelMixin,
+                     ListModelMixin,
                      viewsets.GenericViewSet):
     """
     站内信
     """
-    serializer_class = MessageSerializer
     queryset = Message.objects.all()
+    pagination_class = StandardResultsSetPagination
+
+    #根据请求类型POST/GET/PUT(PATCH)，使用不同的serializer
+    def get_serializer_class(self):
+        if self.action == 'list':
+            return MessageGetSerializer
+        return MessagePostSerializer
 
     #GET /messages/?senderID=xxx&receiverID=yyy/
-    def get(self,request):
+    def list(self, request, *args, **kwargs):
         senderID = request.query_params.get('senderID')
         receiverID = request.query_params.get('receiverID')
         if senderID and receiverID:
@@ -79,7 +93,12 @@ class MessageViewSet(CreateModelMixin,
             queryset = Message.objects.filter(receiverID=receiverID)
         else:
             queryset = []
-        serializer = self.get_serializer(queryset,many=True)
+        page = self.paginate_queryset(queryset)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+
+        serializer = self.get_serializer(queryset, many=True)
         return Response(serializer.data)
 
 class FollowViewSet(CreateModelMixin,
@@ -94,13 +113,25 @@ class FollowViewSet(CreateModelMixin,
     delete:
         取关
     """
-    serializer_class = FollowSerializer
     queryset = Follow.objects.all()
+    pagination_class = StandardResultsSetPagination
+
+    #根据请求类型POST/GET/PUT(PATCH)，使用不同的serializer
+    def get_serializer_class(self):
+        if self.action == 'retrieve' or self.action == 'list':
+            return FollowGetSerializer
+        return FollowPostSerializer
 
     #GET /follow/{id}/
     def retrieve(self, request, *args, **kwargs):
         queryset = Follow.objects.filter(userID=kwargs['pk'])
-        serializer = self.get_serializer(queryset,many=True)
+
+        page = self.paginate_queryset(queryset)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+
+        serializer = self.get_serializer(queryset, many=True)
         return Response(serializer.data)
 
     #DELETE /follow/{id}/?followID=xxx
@@ -116,17 +147,18 @@ class ExpertCheckViewSet(CreateModelMixin,
                          viewsets.GenericViewSet):
     """
     read:
-    列出指定的表单
+        列出指定的表单
     list:
-    列出所有未经审核的专家申请表单
+        列出所有未经审核的专家申请表单
     create:
-    用户提交申请表单
+        用户提交申请表单
     update:
-    管理员审核表单
+        管理员审核表单
     patial_update:
-    管理员审核表单
+        管理员审核表单
     """
     queryset = ExpertCheckForm.objects.all()
+    pagination_class = StandardResultsSetPagination
 
     #根据请求类型POST/GET/PUT(PATCH)，使用不同的serializer
     def get_serializer_class(self):
@@ -159,6 +191,13 @@ class ExpertCheckViewSet(CreateModelMixin,
         serializer = self.get_serializer(queryset, many=True)
         return Response(serializer.data)
 
+    #管理员根据userID获取表单(迷惑行为？？？
+    #GET /applicaiton/{id}
+    def retrieve(self, request, *args, **kwargs):
+        queryset = ExpertCheckForm.objects.filter(userID=kwargs['pk'],isCheck=False)
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(serializer.data)
+
     #管理员审核（更新）表单
     #PUT/PATCH /applications/{formID}
     def update(self, request, *args, **kwargs):
@@ -170,7 +209,7 @@ class ExpertCheckViewSet(CreateModelMixin,
 
         if serializer.validated_data.get('isPass'):
             user = serializer.validated_data.get('userID')
-            intro = serializer.validated_data.get('intro')
+            introduction = serializer.validated_data.get('introduction')
             constitution = serializer.validated_data.get('constitution')
             realName = serializer.validated_data.get('realName')
 
@@ -178,7 +217,7 @@ class ExpertCheckViewSet(CreateModelMixin,
             user.isExpert=True
             user.save()
 
-            expert = ExpertProfile(user=user,intro=intro,constitution=constitution,realName=realName)
+            expert = ExpertProfile(user=user,introduction=introduction,constitution=constitution,realName=realName)
             expert.save()
 
         if getattr(instance, '_prefetched_objects_cache', None):

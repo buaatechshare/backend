@@ -37,7 +37,7 @@ class ExpertProfile(models.Model):
     科技专家（专家信息表）
     """
     user = models.OneToOneField(UserProfile,primary_key=True,on_delete=models.CASCADE,to_field='userID',related_name='expert',verbose_name='专家ID')
-    intro = models.TextField(blank=True,null=True,verbose_name='自我介绍')
+    introduction = models.TextField(blank=True,null=True,verbose_name='自我介绍')
     constitution = models.CharField(max_length=255,blank=True,null=True,verbose_name='所在机构')
     realName = models.CharField(max_length=255,verbose_name='真实姓名')
     expert_add_time = models.DateTimeField(default=datetime.now,verbose_name='添加时间')
@@ -78,6 +78,7 @@ class Follow(models.Model):
     class Meta:
         verbose_name = '用户关注'
         verbose_name_plural = verbose_name
+        unique_together = ('userID','followID')
 
     def __str__(self):
         return str(self.userID)+'Follow'+str(self.followID)
@@ -106,7 +107,7 @@ class ExpertCheckForm(models.Model):
     isCheck = models.BooleanField(default=False,verbose_name='是否被审核过')
     reason = models.TextField(verbose_name='管理员意见')
     adminID = models.IntegerField(null=True,verbose_name='管理员ID')
-    intro = models.TextField(verbose_name='个人简介')
+    introduction = models.TextField(verbose_name='个人简介')
     constitution = models.CharField(max_length=255,verbose_name='所在机构')
     realName = models.CharField(max_length=255,verbose_name='真实姓名')
     add_time = models.DateTimeField(default=datetime.now,verbose_name='申请时间')

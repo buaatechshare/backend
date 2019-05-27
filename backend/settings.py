@@ -44,7 +44,7 @@ INSTALLED_APPS = [
     'rest_framework_jwt',
     'users',
     'corsheaders',
-    #'resources',
+    'resources',
 ]
 
 MIDDLEWARE = [
@@ -59,7 +59,7 @@ MIDDLEWARE = [
 ]
 
 ROOT_URLCONF = 'backend.urls'
-APPEND_SLASH = True
+APPEND_SLASH = False
 
 TEMPLATES = [
     {
@@ -155,6 +155,7 @@ REST_FRAMEWORK = {
         'rest_framework.authentication.SessionAuthentication',
         'rest_framework.authentication.BasicAuthentication',
     ),
+    #'DEFAULT_PAGINATION_CLASS'
 }
 
 JWT_AUTH = {

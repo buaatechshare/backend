@@ -1,15 +1,29 @@
-# # global-site packages
-# from datetime import datetime
-#
-# # django&restframework packges
-# from django.db import models
-#
-# # third-party packges
-#
-# # my-own packages
-# from users.models import UserProfile
-#
-# # Create your models here.
+# global-site packages
+from datetime import datetime
+
+# django&restframework packges
+from django.db import models
+
+# third-party packges
+
+# my-own packages
+from users.models import UserProfile
+
+# Create your models here.
+
+class Comment(models.Model):
+    """
+    资源评论表
+    """
+    commentID = models.AutoField(primary_key=True)
+    userID = models.ForeignKey(UserProfile,to_field='userID',on_delete=models.CASCADE)
+    resourceID = models.CharField(max_length=255)
+    content = models.TextField()
+    rate = models.IntegerField()
+    add_time = models.DateTimeField(default=datetime.now,)
+
+
+
 #
 # class Resource(models.Model):
 #     """
