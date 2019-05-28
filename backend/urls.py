@@ -20,7 +20,7 @@ from rest_framework.routers import DefaultRouter
 from rest_framework.documentation import include_docs_urls
 
 from users.views import UserViewSet,MessageViewSet,ExpertCheckViewSet,FollowViewSet
-from resources.views import CommentViewSet
+from resources.views import CommentViewSet,paperDetail,patentDetail,searchPapers
 
 router = DefaultRouter()
 #用户注册register
@@ -38,6 +38,9 @@ router.register('follow',FollowViewSet,base_name='follow')
 #用户对资源评论
 router.register('comment',CommentViewSet,base_name='comment')
 
+#论文详细信息
+# router.register('papers',PaperViewSet,base_name='paper')
+
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('api-auth/',include('rest_framework.urls')),
@@ -46,5 +49,9 @@ urlpatterns = [
     #router注册的url
     path('',include(router.urls)),
     #drf自带文档管理
-    path('docs/',include_docs_urls(title='backend'))
+    path('docs/',include_docs_urls(title='backend')),
+
+    path('paperDetail/<str:paperID>/',paperDetail),
+    path('patentDetail/<str:patentID>/',patentDetail),
+    path('search/papers/',searchPapers)
 ]

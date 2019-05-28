@@ -6,14 +6,109 @@ from rest_framework.mixins import CreateModelMixin,RetrieveModelMixin,ListModelM
 from rest_framework import viewsets,status
 from rest_framework.response import Response
 from rest_framework.pagination import PageNumberPagination
-
+from django.http import JsonResponse,HttpResponse
+from django.core.paginator import Paginator,PageNotAnInteger,EmptyPage
+from django.core import serializers
 # third-party packges
-from rest_framework_jwt.serializers import jwt_encode_handler, jwt_payload_handler
+from elasticsearch import Elasticsearch
 
 # my-own packages
 from users.views import StandardResultsSetPagination
 from .models import Comment
 from .serializers import CommentPostSerializer,CommentGetSerializer
+
+
+#GET /paperDetail/{paperID}
+def paperDetail(request,paperID):
+    es = Elasticsearch("127.0.0.1:9200")
+    ret = es.search(index='papers',
+                    body={
+                        'query':{
+                            'term':{'_id':paperID}
+                        }
+                    })
+    paper_item = ret['hits']['hits'][0]['_source']
+    return JsonResponse(paper_item)
+
+#GET /patentDetail/{patentID}
+def patentDetail(request,patentID):
+    es = Elasticsearch('127.0.0.1:9200')
+    # ret = es.search(index='patents',
+    #                 body={
+    #                     'query': {
+    #                         'term': {'_id': patentID}
+    #                     }
+    #                 })
+    ret = es.get(
+        index='patents',
+        id = patentID,
+    )
+    patent_item = ret['_source']['Patent']
+    return JsonResponse(patent_item)
+
+#DSL QUERY????
+#GET /search/papers/?keywords=aaa&page=xxx&pageSize=yyy
+def searchPapers(request):
+    keywords = request.GET.get('keywords')
+    page = request.GET.get('page',0)
+    pageSize = request.GET.get('pageSize',10)
+    es = Elasticsearch('127.0.0.1:9200')
+    ret = es.search(index='papers',
+                    body={
+                      "multi_match": {
+                        "query": keywords,
+                        "fields": [
+                          "title",
+                          "abstract",
+                          "keywords",
+                          "fos"
+                        ]
+                      }
+                    })
+    ret = ret['hits']['hits']
+    paper_list = []
+    for item in ret:
+        paper_list.append(item['_source'])
+    paginator = Paginator(paper_list,pageSize)
+    try:
+        papers = paginator.page(page)
+    except PageNotAnInteger:
+        papers = paginator.page(pageSize)
+    except EmptyPage:
+        papers = paginator.page(paginator.num_pages)
+    papers = papers.object_list
+    return JsonResponse(papers,safe=False)
+
+    # json_data = serializers.serialize("json",papers,ensure_ascii=False)
+    # return HttpResponse(json_data,content_type='applicaiton/json',charset='utf-8')
+
+
+# class PaperViewSet(RetrieveModelMixin,
+#                    #ListModelMixin,
+#                    viewsets.GenericViewSet):
+#     """
+#     retrieve:
+#         根据resourceID获取对应的论文条目
+#     """
+#     queryset = Comment.objects.all()
+#     pagination_class = StandardResultsSetPagination
+#     serializer_class = CommentGetSerializer
+#     lookup
+#
+#     def retrieve(self, request, *args, **kwargs):
+#         paperID = kwargs.get('resourceID')
+#         es = Elasticsearch("127.0.0.1:9200")
+#
+#         ret = es.search(index='papers',
+#                         body={
+#                             "term":{
+#                                 '_id':paperID
+#                             }
+#                         })
+#
+#         instance = self.get_object()
+#         serializer = self.get_serializer(instance)
+#         return Response(serializer.data)
 
 class CommentViewSet(CreateModelMixin,
                      ListModelMixin,

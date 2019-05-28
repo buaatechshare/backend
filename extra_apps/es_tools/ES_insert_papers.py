@@ -16,7 +16,7 @@ files= os.listdir(path)
 num_id = 0
 try:
     for filename in files:
-        if filename[:3]=='pap':
+        if filename == 'mag_papers_160.data.txt':
             with open(filename,'r') as fin:
                 s = time.time()
                 actions = []
@@ -25,8 +25,8 @@ try:
                     ind = paper['id']
                     paper.pop('id')
                     action = {
-                        "_index": "patents",
-                        "_type": "patent",
+                        "_index": "papers",
+                        "_type": "paper",
                         "_id": ind,
                         "_source": paper
                     }
@@ -37,6 +37,8 @@ try:
                         actions = []
                         e = time.time()
                         print("{} {}s".format(a,e-s))
+                    if num_id == 100000:
+                        break
                 if len(actions):
                     a = helpers.bulk(es, actions)
                     actions = []

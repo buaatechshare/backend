@@ -17,7 +17,7 @@ num_id = 0
 try:
     for filename in files:
         if filename[:3]=='pat':
-            with open(filename,'r') as fin:
+            with open(filename,'r',encoding='utf-8') as fin:
                 s = time.time()
                 actions = []
                 for line in fin:
