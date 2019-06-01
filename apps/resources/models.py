@@ -22,7 +22,16 @@ class Comment(models.Model):
     rate = models.IntegerField()
     add_time = models.DateTimeField(default=datetime.now,)
 
+class Collection(models.Model):
+    """
+    用户收藏表
+    """
+    userID = models.ForeignKey(UserProfile,to_field='userID',on_delete=models.CASCADE)
+    resourceID = models.CharField(max_length=255)
+    add_time = models.DateTimeField(default=datetime.now)
 
+    class Meta:
+        unique_together = ('userID','resourceID')
 
 #
 # class Resource(models.Model):

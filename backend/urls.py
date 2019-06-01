@@ -20,7 +20,8 @@ from rest_framework.routers import DefaultRouter
 from rest_framework.documentation import include_docs_urls
 
 from users.views import UserViewSet,MessageViewSet,ExpertCheckViewSet,FollowViewSet
-from resources.views import CommentViewSet,paperDetail,patentDetail,searchPapers
+from resources.views import CollectionViewSet,CommentViewSet
+from resources.views import paperDetail,patentDetail,searchPapers,searchPatents
 
 router = DefaultRouter()
 #用户注册register
@@ -38,6 +39,9 @@ router.register('follow',FollowViewSet,base_name='follow')
 #用户对资源评论
 router.register('comment',CommentViewSet,base_name='comment')
 
+#用户收藏
+router.register('collections',CollectionViewSet,base_name='collection')
+
 #论文详细信息
 # router.register('papers',PaperViewSet,base_name='paper')
 
@@ -53,5 +57,6 @@ urlpatterns = [
 
     path('paperDetail/<str:paperID>/',paperDetail),
     path('patentDetail/<str:patentID>/',patentDetail),
-    path('search/papers/',searchPapers)
+    path('search/papers/',searchPapers),
+    path('search/patents/',searchPatents),
 ]

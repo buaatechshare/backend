@@ -8,8 +8,14 @@ from rest_framework.validators import UniqueValidator,UniqueTogetherValidator
 # third-party packges
 
 # my-own packages
-from .models import Comment
+from .models import Comment,Collection
 from users.serializers import UserInMessageSerializer
+
+
+class CollectionPostSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Collection
+        fields = ('userID','resourceID')
 
 class CommentPostSerializer(serializers.ModelSerializer):
     class Meta:

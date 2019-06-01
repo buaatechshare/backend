@@ -14,13 +14,12 @@ from elasticsearch import Elasticsearch
 
 # my-own packages
 from users.views import StandardResultsSetPagination
-from .models import Comment
-from .serializers import CommentPostSerializer,CommentGetSerializer
+from .models import Comment,Collection
+from .serializers import CommentPostSerializer,CommentGetSerializer,CollectionPostSerializer
+from .es_connect import es
 
-
-#GET /paperDetail/{paperID}
+#GET /paperDetail/{paperID}/
 def paperDetail(request,paperID):
-    es = Elasticsearch("127.0.0.1:9200")
     ret = es.search(index='papers',
                     body={
                         'query':{
@@ -28,17 +27,20 @@ def paperDetail(request,paperID):
                         }
                     })
     paper_item = ret['hits']['hits'][0]['_source']
+    if paper_item['references']:
+        ref = list()
+        for item in paper_item['references']:
+            try:
+                ret = es.get(index='papers', id="f655a070-0da7-46d6-b95b-6b6c9d20f265")
+            except Exception:
+                continue
+            ref.append((item,ret['_source'].get('title')))
+        paper_item['references'] = ref
+
     return JsonResponse(paper_item)
 
-#GET /patentDetail/{patentID}
+#GET /patentDetail/{patentID}/
 def patentDetail(request,patentID):
-    es = Elasticsearch('127.0.0.1:9200')
-    # ret = es.search(index='patents',
-    #                 body={
-    #                     'query': {
-    #                         'term': {'_id': patentID}
-    #                     }
-    #                 })
     ret = es.get(
         index='patents',
         id = patentID,
@@ -50,25 +52,39 @@ def patentDetail(request,patentID):
 #GET /search/papers/?keywords=aaa&page=xxx&pageSize=yyy
 def searchPapers(request):
     keywords = request.GET.get('keywords')
-    page = request.GET.get('page',0)
+    page = request.GET.get('page',1)
     pageSize = request.GET.get('pageSize',10)
-    es = Elasticsearch('127.0.0.1:9200')
-    ret = es.search(index='papers',
-                    body={
-                      "multi_match": {
-                        "query": keywords,
-                        "fields": [
-                          "title",
-                          "abstract",
-                          "keywords",
-                          "fos"
-                        ]
-                      }
-                    })
+    ret = es.search(
+        index="papers",
+        body={
+            "query": {
+                "multi_match": {
+                    "query": keywords,
+                    "fields": [
+                        "title",
+                        "abstract",
+                        "keywords",
+                        "fos"
+                    ]
+                }
+            }
+        }
+    )
+    # 1.将所有内容直接返回
+    # paper_list = ret['hits']['hits']
+    # 2.将结果整理后返回
     ret = ret['hits']['hits']
     paper_list = []
     for item in ret:
-        paper_list.append(item['_source'])
+        paper_item = dict()
+        paper_item['type'] = item['_type']
+        paper_item['id'] = item['_id']
+        paper_item['citation'] = item['_source'].get('n_citaion')
+        paper_item['author'] = item['_source'].get('authors')
+        paper_item['paperName'] = item['_source'].get('title')
+        paper_item['abstract'] = item['_source'].get('abstract')
+        paper_list.append(paper_item)
+
     paginator = Paginator(paper_list,pageSize)
     try:
         papers = paginator.page(page)
@@ -77,11 +93,33 @@ def searchPapers(request):
     except EmptyPage:
         papers = paginator.page(paginator.num_pages)
     papers = papers.object_list
-    return JsonResponse(papers,safe=False)
+    return JsonResponse(paper_list,safe=False)
 
     # json_data = serializers.serialize("json",papers,ensure_ascii=False)
     # return HttpResponse(json_data,content_type='applicaiton/json',charset='utf-8')
 
+# GET /search/patents/?keywords=aaa&page=xxx&pageSize=yyy
+def searchPatents(request):
+    keywords = request.GET.get('keywords')
+    page = request.GET.get('page',0)
+    pageSize = request.GET.get('pageSize',10)
+    ret = es.search(
+        index="patents",
+        body={
+            "query":{
+                "multi_match":{
+                    "query":keywords,
+                    "fields":[
+                        "Patent.TI",
+                        "Patent.AB",
+                        "Patent.CL"
+                    ]
+                }
+            }
+        }
+    )
+    ret = ret['hits']['hits']
+    return JsonResponse(ret,safe=False)
 
 # class PaperViewSet(RetrieveModelMixin,
 #                    #ListModelMixin,
@@ -139,3 +177,19 @@ class CommentViewSet(CreateModelMixin,
         serializer = self.get_serializer(queryset, many=True)
         return Response(serializer.data)
 
+class CollectionViewSet(CreateModelMixin,
+                        DestroyModelMixin,
+                        viewsets.GenericViewSet):
+    """
+
+    """
+    queryset = Collection.objects.all()
+    serializer_class = CollectionPostSerializer
+    lookup_field = 'userID'
+
+    def destroy(self, request, *args, **kwargs):
+        userID = kwargs['userID']
+        resourceID = request.query_params.get('resourceID')
+        instance = Collection.objects.filter(userID=userID,resourceID=resourceID)
+        self.perform_destroy(instance)
+        return Response(status=status.HTTP_204_NO_CONTENT)
