@@ -12,6 +12,9 @@ https://docs.djangoproject.com/en/2.1/ref/settings/
 import datetime
 import os
 import sys
+import logging
+
+
 # Build paths inside the project like this: os.path.join(BASE_DIR, ...)
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0,BASE_DIR)
@@ -94,7 +97,7 @@ DATABASES = {
         'USER':'root',
         'PASSWORD':'',
         'HOST':'127.0.0.1',
-        'PORT':'3307',
+        'PORT':'3306',
         'OPTIONS':{'init_command':'SET default_storage_engine=INNODB;'},
     },
     'rep1': {
@@ -103,7 +106,7 @@ DATABASES = {
         'USER':'root',
         'PASSWORD':'',
         'HOST':'127.0.0.1',
-        'PORT':'3308',
+        'PORT':'3307',
         'OPTIONS':{'init_command':'SET default_storage_engine=INNODB;'},
     },
 }
@@ -176,4 +179,52 @@ CORS_ALLOW_METHODS = (
     'PUT',
     'VIEW',
 )
+
+LOG_PATH = os.path.join(BASE_DIR, 'log')
+if not os.path.isdir(LOG_PATH):
+    os.mkdir(LOG_PATH)
+
+LOGGING = {
+    # 规定只能这样写
+    'version': 1,
+    # True表示禁用loggers
+    'disable_existing_loggers': False,
+    # 指定文件写入的格式——这里写了两个不同的格式，方便在后面不同情况需要的时候使用
+    'formatters': {
+        'default': {
+            'format': '%(levelno)s %(funcName)s %(asctime)s %(message)s'
+        },
+        'simple': {
+            'format': '%(levelname)s %(module)s %(asctime)s %(message)s'
+        }
+    },
+    'handlers': {
+        'stu_handlers': {
+            'level': 'DEBUG',
+            # 日志文件指定为多大(5M)， 超过大小(5M)重新命名，然后写新的日志文件
+            'class': 'logging.handlers.RotatingFileHandler',
+            'maxBytes': 5 * 1024 * 1024,
+            # 储存到的文件地址
+            'filename': '%s/log.txt' % LOG_PATH,
+            'formatter': 'default'
+        },
+        'uauth_handlers': {
+            'level': 'DEBUG',
+            'class': 'logging.handlers.RotatingFileHandler',
+            'maxBytes': 5 * 1024 * 1024,
+            'filename': '%s/uauth_log.txt' % LOG_PATH,
+            'formatter': 'simple'
+        }
+    },
+    'loggers': {
+        'stu': {
+            'handlers': ['stu_handlers'],
+            'level': 'INFO'
+        },
+        'auth': {
+            'handlers': ['uauth_handlers'],
+            'level': 'INFO'
+        }
+    },
+}
 

@@ -11,12 +11,14 @@ from django.core.paginator import Paginator,PageNotAnInteger,EmptyPage
 from django.core import serializers
 # third-party packges
 from elasticsearch import Elasticsearch
-
+import logging
 # my-own packages
 from users.views import StandardResultsSetPagination
 from .models import Comment,Collection
 from .serializers import CommentPostSerializer,CommentGetSerializer,CollectionPostSerializer
 from .es_connect import es
+logger = logging.getLogger('stu')
+
 
 #GET /paperDetail/{paperID}/
 def paperDetail(request,paperID):
@@ -32,11 +34,11 @@ def paperDetail(request,paperID):
         for item in paper_item['references']:
             try:
                 ret = es.get(index='papers', id="f655a070-0da7-46d6-b95b-6b6c9d20f265")
+                logger.info('time:%s user_id: resource_type:patent resource_id: %s ' % (datetime.now, paperID))
             except Exception:
                 continue
             ref.append((item,ret['_source'].get('title')))
         paper_item['references'] = ref
-
     return JsonResponse(paper_item)
 
 #GET /patentDetail/{patentID}/
@@ -45,6 +47,7 @@ def patentDetail(request,patentID):
         index='patents',
         id = patentID,
     )
+    logger.info('time:%s user_id: resource_type:patent resource_id: %s ' % (datetime.now, id))
     patent_item = ret['_source']['Patent']
     return JsonResponse(patent_item)
 
@@ -65,7 +68,7 @@ def searchPapers(request):
                         "abstract",
                         "keywords",
                         "fos"
-                    ]
+                    ],
                 }
             }
         }

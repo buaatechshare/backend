@@ -28,6 +28,7 @@ class CommentGetSerializer(serializers.ModelSerializer):
         model = Comment
         fields = ('userID','content','rate','add_time')
 
+
     # commentID = models.AutoField(primary_key=True)
     # userID = models.ForeignKey(UserProfile,to_field='userID',on_delete=models.CASCADE)
     # resourceID = models.CharField(max_length=255)

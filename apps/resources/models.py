@@ -33,6 +33,9 @@ class Collection(models.Model):
     class Meta:
         unique_together = ('userID','resourceID')
 
+
+
+
 #
 # class Resource(models.Model):
 #     """
