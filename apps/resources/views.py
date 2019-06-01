@@ -93,7 +93,10 @@ def searchPapers(request):
     except EmptyPage:
         papers = paginator.page(paginator.num_pages)
     papers = papers.object_list
-    return JsonResponse(paper_list,safe=False)
+    ret = dict()
+    ret['count'] = paginator.count
+    ret['results'] = papers
+    return JsonResponse(ret,safe=False)
 
     # json_data = serializers.serialize("json",papers,ensure_ascii=False)
     # return HttpResponse(json_data,content_type='applicaiton/json',charset='utf-8')
@@ -179,6 +182,7 @@ class CommentViewSet(CreateModelMixin,
 
 class CollectionViewSet(CreateModelMixin,
                         DestroyModelMixin,
+                        ListModelMixin,
                         viewsets.GenericViewSet):
     """
 
@@ -193,3 +197,15 @@ class CollectionViewSet(CreateModelMixin,
         instance = Collection.objects.filter(userID=userID,resourceID=resourceID)
         self.perform_destroy(instance)
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+    # def list(self, request, *args, **kwargs):
+    #     #queryset = self.filter_queryset(self.get_queryset())
+    #     queryset =
+    #
+    #     page = self.paginate_queryset(queryset)
+    #     if page is not None:
+    #         serializer = self.get_serializer(page, many=True)
+    #         return self.get_paginated_response(serializer.data)
+    #
+    #     serializer = self.get_serializer(queryset, many=True)
+    #     return Response(serializer.data)
