@@ -8,7 +8,7 @@ from rest_framework.validators import UniqueValidator,UniqueTogetherValidator
 # third-party packges
 
 # my-own packages
-from .models import UserProfile,Message,Follow,ExpertCheckForm,ExpertProfile
+from .models import UserProfile,Message,Follow,ExpertCheckForm,ExpertProfile, Fields, Tags
 
 class UserDetailSerializer(serializers.ModelSerializer):
     class Meta:
@@ -107,4 +107,16 @@ class ExpertApplySerializer(serializers.ModelSerializer):
 class ExpertCheckSerializer(serializers.ModelSerializer):
     class Meta:
         model = ExpertCheckForm
+        fields = '__all__'
+
+
+class FieldsSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Fields
+        fields = '__all__'
+
+class TagSerializer(serializers.ModelSerializer):
+    userID = serializers.IntegerField(read_only=True)
+    class Meta:
+        model = Tags
         fields = '__all__'

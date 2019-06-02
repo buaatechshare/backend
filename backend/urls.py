@@ -22,6 +22,9 @@ from rest_framework.documentation import include_docs_urls
 from users.views import UserViewSet,MessageViewSet,ExpertCheckViewSet,FollowViewSet
 from resources.views import CollectionViewSet,CommentViewSet,PaperCheckViewSet
 from resources.views import paperDetail,PatentView,searchPapers,searchPatents,PaperView
+from users.views import get_user_fuzzy_by_name, FieldViewSet
+from resources.views import CollectionViewSet,CommentViewSet
+from resources.views import paperDetail,patentDetail,searchPapers,searchPatents
 
 router = DefaultRouter()
 #用户注册register
@@ -48,6 +51,9 @@ router.register('paperCheck',PaperCheckViewSet,base_name='paperCheck')
 #论文详细信息
 # router.register('papers',PaperViewSet,base_name='paper')
 
+#用户领域
+router.register('field', FieldViewSet, base_name='fields')
+
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('api-auth/',include('rest_framework.urls')),
@@ -62,4 +68,5 @@ urlpatterns = [
     path('patentDetail/<str:patentID>/',PatentView.as_view()),
     path('search/papers/',searchPapers),
     path('search/patents/',searchPatents),
+    path('receiver/<str:userName>/', get_user_fuzzy_by_name)
 ]

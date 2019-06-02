@@ -6,6 +6,7 @@ from rest_framework.mixins import CreateModelMixin,RetrieveModelMixin,ListModelM
 from rest_framework import viewsets,status
 from rest_framework.response import Response
 from rest_framework.pagination import PageNumberPagination
+from django.http import JsonResponse, HttpResponse
 
 # third-party packges
 from rest_framework_jwt.serializers import jwt_encode_handler, jwt_payload_handler
@@ -13,7 +14,8 @@ from rest_framework_jwt.serializers import jwt_encode_handler, jwt_payload_handl
 # my-own packages
 from .serializers import UserRegSerializer,MessageGetSerializer,MessagePostSerializer,FollowGetSerializer,FollowPostSerializer,UserDetailSerializer,UserUpdateSerializer
 from .serializers import ExpertApplySerializer,ExpertCheckSerializer
-from .models import UserProfile,Message,Follow,ExpertCheckForm,ExpertProfile
+from .serializers import FieldsSerializer, TagSerializer
+from .models import UserProfile,Message,Follow,ExpertCheckForm,ExpertProfile, Fields, Tags
 
 # Create your views here.
 
@@ -226,3 +228,75 @@ class ExpertCheckViewSet(CreateModelMixin,
             instance._prefetched_objects_cache = {}
 
         return Response(serializer.data)
+
+
+#返回用户名的模糊查询
+#receiver/<str:userName>/
+def get_user_fuzzy_by_name(request, userName):
+    fuzzy_name_set = UserProfile.objects.filter(name__istartswith=userName)[:10]
+    fuzzy_name = []
+    for i in fuzzy_name_set:
+        fuzzy_name.append(i.name)
+    name_dict = dict()
+    name_dict['userName'] = fuzzy_name
+    return JsonResponse(name_dict, safe=False)
+
+
+class FieldViewSet(CreateModelMixin,
+                         ListModelMixin,
+                         UpdateModelMixin,
+                         RetrieveModelMixin,
+                         viewsets.GenericViewSet):
+    def get_queryset(self):
+        if self.action == 'get' or self.action == 'list':
+            return Fields.objects.all()
+        elif self.action == 'post':
+            return Tags.objects.all()
+        return  Tags.objects.all()
+
+    def get_serializer_class(self, *args, **kwargs):
+        if self.action == 'get' or self.action == 'list':
+            return FieldsSerializer
+        elif self.action == 'update' or self.action == 'partial_update':
+            return TagSerializer
+        return  TagSerializer
+
+    # 查看所有符合输入的关键词
+    # GET /field ?keywords=
+    def list(self, request, *args, **kwargs):
+        queryset = Fields.objects.filter(field__icontains=request.GET.get('keywords', ''))[:500]
+        queryset = self.filter_queryset(queryset)
+        selectedfield = []
+        for i in queryset:
+            selectedfield.append(i.field)
+        questlist = dict()
+        questlist['tag'] = selectedfield
+        return JsonResponse(questlist)
+
+    #def update(self, request, *args, **kwargs):
+    #    return JsonResponse("[\"fee\"]", safe=False)
+
+    # 上传用户领域
+    # PUT /field/{userID}
+    def update(self, request, *args, **kwargs):
+        #data = dict()
+        #data['pk'] = int(kwargs['pk'])
+        #data['field'] = request.data['field']
+        #return JsonResponse(request.data['field'], safe=False)
+        #serializer = self.get_serializer(data=request.data)
+        #serializer.is_valid(raise_exception=True)
+        #self.perform_create(serializer)
+        #headers = self.get_success_headers(serializer.data)
+        #return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
+
+        Tags.objects.update_or_create(userID__exact=kwargs['pk'])
+        tag = Tags.objects.get(userID__exact=kwargs['pk'])
+        tag.field.clear()
+        for i in request.data['field']:
+            tag.field.add(Fields.objects.get(field__exact=i).fieldID)
+        return JsonResponse("OK", safe=False, status=status.HTTP_201_CREATED)
+
+
+
+
+
