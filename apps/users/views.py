@@ -14,7 +14,7 @@ from rest_framework_jwt.serializers import jwt_encode_handler, jwt_payload_handl
 
 # my-own packages
 from .serializers import UserRegSerializer,MessageGetSerializer,MessagePostSerializer,FollowGetSerializer,FollowPostSerializer,UserDetailSerializer,UserUpdateSerializer
-from .serializers import ExpertApplySerializer,ExpertCheckSerializer
+from .serializers import ExpertApplySerializer,ReceiverSerializer
 from .models import UserProfile,Message,Follow,ExpertCheckForm,ExpertProfile
 
 # Create your views here.
@@ -227,4 +227,22 @@ class ExpertCheckViewSet(CreateModelMixin,
             # forcibly invalidate the prefetch cache on the instance.
             instance._prefetched_objects_cache = {}
 
+        return Response(serializer.data)
+
+class ReceiverViewSet(CreateModelMixin,
+                    RetrieveModelMixin,
+                    DestroyModelMixin,
+                    viewsets.GenericViewSet):
+    #GET /receiver/{userName}
+    def get_serializer_class(self):
+            return ReceiverSerializer
+
+    def receiver(self, request, *args, **kwargs):
+        queryset = UserProfile.objects.filter(name__iexact=kwargs)
+        page = self.paginate_queryset(queryset)
+        if page is not None:
+            serializer = self.get_serializer_class(page)
+            return self.get_paginated_response(serializer.data)
+
+        serializer = self.get_serializer_class(queryset)
         return Response(serializer.data)
