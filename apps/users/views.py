@@ -252,12 +252,14 @@ class FieldViewSet(CreateModelMixin,
             return Fields.objects.all()
         elif self.action == 'post':
             return Tags.objects.all()
+        return  Tags.objects.all()
 
     def get_serializer_class(self, *args, **kwargs):
         if self.action == 'get' or self.action == 'list':
             return FieldsSerializer
-        elif self.action == 'post' :
+        elif self.action == 'update' or self.action == 'partial_update':
             return TagSerializer
+        return  TagSerializer
 
     # 查看所有符合输入的关键词
     # GET /field ?keywords=
@@ -271,23 +273,29 @@ class FieldViewSet(CreateModelMixin,
         questlist['tag'] = selectedfield
         return JsonResponse(questlist)
 
-    # 上传用户领域
-    # POST /field/{userID}
-    def create(self, request, *args, **kwargs):
-        serializer = self.get_serializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        self.perform_create(serializer)
-        headers = self.get_success_headers(serializer.data)
-        return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
+    #def update(self, request, *args, **kwargs):
+    #    return JsonResponse("[\"fee\"]", safe=False)
 
-        #userID = request.POST['userID']
-        #fields = request.POST.getlist('tags')
-        #tag = Tags()
-        #tag.userID = userID
-        #tag.save()
-        #for i in fields:
-        #    tag.field.add(i)
-        #    tag.save()
+    # 上传用户领域
+    # PUT /field/{userID}d
+    def update(self, request, *args, **kwargs):
+        #data = dict()
+        #data['pk'] = int(kwargs['pk'])
+        #data['field'] = request.data['field']
+        #return JsonResponse(request.data['field'], safe=False)
+        #serializer = self.get_serializer(data=request.data)
+        #serializer.is_valid(raise_exception=True)
+        #self.perform_create(serializer)
+        #headers = self.get_success_headers(serializer.data)
+        #return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
+
+        Tags.objects.update_or_create(userID__exact=kwargs['pk'])
+        tag = Tags.objects.get(userID__exact=kwargs['pk'])
+        tag.field.clear()
+        for i in request.data['field']:
+            tag.field.add(Fields.objects.get(field__exact=i).fieldID)
+        return JsonResponse("", safe=False, status=status.HTTP_201_CREATED)
+
 
 
 

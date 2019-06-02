@@ -47,7 +47,7 @@ router.register('collections',CollectionViewSet,base_name='collection')
 # router.register('papers',PaperViewSet,base_name='paper')
 
 #用户领域
-router.register('fields', FieldViewSet, base_name='fields')
+router.register('field', FieldViewSet, base_name='fields')
 
 urlpatterns = [
     path('admin/', admin.site.urls),
