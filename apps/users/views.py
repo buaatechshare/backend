@@ -277,7 +277,7 @@ class FieldViewSet(CreateModelMixin,
     #    return JsonResponse("[\"fee\"]", safe=False)
 
     # 上传用户领域
-    # PUT /field/{userID}d
+    # PUT /field/{userID}
     def update(self, request, *args, **kwargs):
         #data = dict()
         #data['pk'] = int(kwargs['pk'])
@@ -294,7 +294,7 @@ class FieldViewSet(CreateModelMixin,
         tag.field.clear()
         for i in request.data['field']:
             tag.field.add(Fields.objects.get(field__exact=i).fieldID)
-        return JsonResponse("", safe=False, status=status.HTTP_201_CREATED)
+        return JsonResponse("OK", safe=False, status=status.HTTP_201_CREATED)
 
 
 
