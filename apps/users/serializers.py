@@ -115,8 +115,20 @@ class FieldsSerializer(serializers.ModelSerializer):
         model = Fields
         fields = '__all__'
 
+
 class TagSerializer(serializers.ModelSerializer):
-    userID = serializers.IntegerField(read_only=True)
+    userID = serializers.IntegerField()
+    field = serializers.CharField()
+
     class Meta:
         model = Tags
-        fields = '__all__'
+        fields = ('userID', 'field')
+
+    #def create(self, validated_data):
+    #    tag = super().create(validated_data)
+    #    userID = validated_data.get('userID')
+    #    field = validated_data.get('field')
+    #    tag.userID = userID
+    #    tag.field = field
+    #    tag.save()
+    #    return tag

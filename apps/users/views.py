@@ -241,6 +241,12 @@ def get_user_fuzzy_by_name(request, userName):
     name_dict['userName'] = fuzzy_name
     return JsonResponse(name_dict, safe=False)
 
+# 返回推荐论文
+# /papersRec/{userID}
+#def get_rec_paper()
+
+# 返回推荐专利
+
 
 class FieldViewSet(CreateModelMixin,
                          ListModelMixin,
@@ -257,7 +263,8 @@ class FieldViewSet(CreateModelMixin,
     def get_serializer_class(self, *args, **kwargs):
         if self.action == 'get' or self.action == 'list':
             return FieldsSerializer
-        elif self.action == 'update' or self.action == 'partial_update':
+        elif self.action == 'update' or self.action == 'partial_update' or self.action == 'post' \
+                or self.action == 'read':
             return TagSerializer
         return  TagSerializer
 
@@ -277,25 +284,32 @@ class FieldViewSet(CreateModelMixin,
     #    return JsonResponse("[\"fee\"]", safe=False)
 
     # 上传用户领域
-    # PUT /field/{userID}
-    def update(self, request, *args, **kwargs):
-        #data = dict()
-        #data['pk'] = int(kwargs['pk'])
-        #data['field'] = request.data['field']
-        #return JsonResponse(request.data['field'], safe=False)
-        #serializer = self.get_serializer(data=request.data)
-        #serializer.is_valid(raise_exception=True)
-        #self.perform_create(serializer)
-        #headers = self.get_success_headers(serializer.data)
-        #return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
+    # POST /field/{userID}
+    # 由于create限制，field参数不能传入数组，因此采用传递数组转成的字符串
+    def create(self, request, *args, **kwargs):
+        #return JsonResponse(request.data, safe=False)
 
-        Tags.objects.update_or_create(userID__exact=kwargs['pk'])
-        tag = Tags.objects.get(userID__exact=kwargs['pk'])
-        tag.field.clear()
-        for i in request.data['field']:
-            tag.field.add(Fields.objects.get(field__exact=i).fieldID)
+        #Tags.objects.update_or_create(userID__exact=request.data['userID'])
+        #tag = Tags.objects.get(userID__exact=kwargs['pk'])
+        #tag.field.clear()
+        #for i in request.data['field']:
+        #    tag.field.add(Fields.objects.get(field__exact=i).fieldID)
+        #return JsonResponse("OK", safe=False, status=status.HTTP_201_CREATED)
+
+        str = request.data['field'].replace('{','').replace('}','').replace('[','').replace(']','').replace('"','').replace('\'','')
+        arr = str.split(',')
+
+        userid = UserProfile.objects.filter(userID__exact=request.data['userID'])[0]
+
+        for i in arr:
+            if Tags.objects.filter(userID__exact=request.data['userID'], field__exact=i).exists():
+                continue
+            field = Fields.objects.filter(field__exact=i)[0]
+            tag = Tags()
+            tag.userID = userid
+            tag.field = field
+            tag.save()
         return JsonResponse("OK", safe=False, status=status.HTTP_201_CREATED)
-
 
 
 

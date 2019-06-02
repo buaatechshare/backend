@@ -138,7 +138,7 @@ class ExpertCheckForm(models.Model):
 
 class Fields(models.Model):
     fieldID = models.AutoField(primary_key=True, verbose_name='领域编号')
-    field = models.CharField(max_length=100, verbose_name='领域名称')
+    field = models.CharField(max_length=100, unique=True, verbose_name='领域名称')
 
     class Meta:
         verbose_name = '领域名称表单'
@@ -149,10 +149,11 @@ class Fields(models.Model):
 
 
 class Tags(models.Model):
-    userID = models.ForeignKey(UserProfile, primary_key=True, to_field='userID', on_delete=models.CASCADE, verbose_name='用户ID')
-    field = models.ManyToManyField(Fields)
+    userID = models.ForeignKey(UserProfile, to_field='userID', on_delete=models.CASCADE, verbose_name='用户ID')
+    field = models.ForeignKey(Fields, to_field='field', on_delete=models.CASCADE, verbose_name='用户领域')
 
     class Meta:
+        unique_together = ("userID", "field")
         verbose_name = '用户领域表单'
         verbose_name_plural = verbose_name
 
