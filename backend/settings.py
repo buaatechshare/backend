@@ -183,7 +183,7 @@ CORS_ALLOW_METHODS = (
 LOG_PATH = os.path.join(BASE_DIR, 'log')
 if not os.path.isdir(LOG_PATH):
     os.mkdir(LOG_PATH)
-
+#创建日志目录
 LOGGING = {
     # 规定只能这样写
     'version': 1,
@@ -199,7 +199,7 @@ LOGGING = {
         }
     },
     'handlers': {
-        'stu_handlers': {
+        'auth_handlers': {
             'level': 'DEBUG',
             # 日志文件指定为多大(5M)， 超过大小(5M)重新命名，然后写新的日志文件
             'class': 'logging.handlers.RotatingFileHandler',
@@ -217,11 +217,11 @@ LOGGING = {
         }
     },
     'loggers': {
-        'stu': {
-            'handlers': ['stu_handlers'],
+        'auth': {
+            'handlers': ['auth_handlers'],
             'level': 'INFO'
         },
-        'auth': {
+        'uauth': {
             'handlers': ['uauth_handlers'],
             'level': 'INFO'
         }
