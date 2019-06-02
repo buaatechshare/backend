@@ -134,3 +134,36 @@ class ExpertCheckForm(models.Model):
 #
 #     def __str__(self):
 #         return self.adminID
+
+
+class Fields(models.Model):
+    fieldID = models.AutoField(primary_key=True, verbose_name='领域编号')
+    field = models.CharField(max_length=100, verbose_name='领域名称')
+
+    class Meta:
+        verbose_name = '领域名称表单'
+        verbose_name_plural = verbose_name
+
+    def __str__(self):
+        return self.field
+
+
+class Tags(models.Model):
+    userID = models.ForeignKey(UserProfile, primary_key=True, to_field='userID', on_delete=models.CASCADE, verbose_name='用户ID')
+    field = models.ManyToManyField(Fields)
+
+    class Meta:
+        verbose_name = '用户领域表单'
+        verbose_name_plural = verbose_name
+
+    def __str__(self):
+        return self.userID
+
+
+#class UserField(models.Model):
+#    field = models.ForeignKey(Fields, on_delete=models.CASCADE, verbose_name='领域名称')
+#    userID = models.ForeignKey(Tags , primary_key=True, on_delete=models.CASCADE, verbose_name='用户ID')
+#
+#    class Meta:
+#        verbose_name = '用户领域表单'
+#        verbose_name_plural = verbose_name

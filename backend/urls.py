@@ -19,7 +19,8 @@ from rest_framework_jwt.views import obtain_jwt_token
 from rest_framework.routers import DefaultRouter
 from rest_framework.documentation import include_docs_urls
 
-from users.views import UserViewSet,MessageViewSet,ExpertCheckViewSet,FollowViewSet
+from users.views import UserViewSet,MessageViewSet,ExpertCheckViewSet,FollowViewSet,  \
+from users.views import get_user_fuzzy_by_name, FieldsViewSet
 from resources.views import CollectionViewSet,CommentViewSet
 from resources.views import paperDetail,patentDetail,searchPapers,searchPatents
 
@@ -45,6 +46,9 @@ router.register('collections',CollectionViewSet,base_name='collection')
 #论文详细信息
 # router.register('papers',PaperViewSet,base_name='paper')
 
+#用户领域
+router.register('fields', FieldsViewSet, base_name='fields')
+
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('api-auth/',include('rest_framework.urls')),
@@ -59,4 +63,5 @@ urlpatterns = [
     path('patentDetail/<str:patentID>/',patentDetail),
     path('search/papers/',searchPapers),
     path('search/patents/',searchPatents),
+    path('receiver/<str:userName>/', get_user_fuzzy_by_name)
 ]
