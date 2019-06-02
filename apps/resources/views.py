@@ -17,7 +17,7 @@ from users.views import StandardResultsSetPagination
 from .models import Comment,Collection
 from .serializers import CommentPostSerializer,CommentGetSerializer,CollectionPostSerializer
 from .es_connect import es
-logger = logging.getLogger('stu')
+logger = logging.getLogger('auth')
 
 
 #GET /paperDetail/{paperID}/
@@ -47,7 +47,7 @@ def patentDetail(request,patentID):
         index='patents',
         id = patentID,
     )
-    logger.info('time:%s user_id: resource_type:patent resource_id: %s ' % (datetime.now, id))
+    logger.info('time:%s user_id: resource_type:patent resource_id: %s ' % (datetime.now, id))#在日志中输出时间 类型 资源id
     patent_item = ret['_source']['Patent']
     return JsonResponse(patent_item)
 
@@ -123,6 +123,11 @@ def searchPatents(request):
     )
     ret = ret['hits']['hits']
     return JsonResponse(ret,safe=False)
+
+
+
+
+
 
 # class PaperViewSet(RetrieveModelMixin,
 #                    #ListModelMixin,
