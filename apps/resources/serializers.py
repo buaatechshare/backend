@@ -17,6 +17,19 @@ class CollectionPostSerializer(serializers.ModelSerializer):
         model = Collection
         fields = ('userID','resourceID')
 
+class PaperGetSerializer(serializers.Serializer):
+    paperName = serializers.CharField(max_length=255)
+    abstract = serializers.CharField(max_length=1000)
+    paperID = serializers.CharField(max_length=255)
+    author = serializers.ListField()
+    authorID = serializers.ListField()
+
+class PatentGetSerializer(serializers.Serializer):
+    patentName = serializers.CharField(max_length=255)
+    rightHolder = serializers.CharField(max_length=255)
+    summary = serializers.CharField(max_length=1000)
+    patentID = serializers.CharField(max_length=255)
+
 class CommentPostSerializer(serializers.ModelSerializer):
     class Meta:
         model = Comment

@@ -16,6 +16,7 @@ from elasticsearch import Elasticsearch
 from users.views import StandardResultsSetPagination
 from .models import Comment,Collection
 from .serializers import CommentPostSerializer,CommentGetSerializer,CollectionPostSerializer
+from .serializers import PaperGetSerializer,PatentGetSerializer
 from .es_connect import es
 
 #GET /paperDetail/{paperID}/
@@ -27,11 +28,11 @@ def paperDetail(request,paperID):
                         }
                     })
     paper_item = ret['hits']['hits'][0]['_source']
-    if paper_item['references']:
+    if paper_item.get('references') is not None:
         ref = list()
         for item in paper_item['references']:
             try:
-                ret = es.get(index='papers', id="f655a070-0da7-46d6-b95b-6b6c9d20f265")
+                ret = es.get(index='papers', id=item)
             except Exception:
                 continue
             ref.append((item,ret['_source'].get('title')))
@@ -124,33 +125,6 @@ def searchPatents(request):
     ret = ret['hits']['hits']
     return JsonResponse(ret,safe=False)
 
-# class PaperViewSet(RetrieveModelMixin,
-#                    #ListModelMixin,
-#                    viewsets.GenericViewSet):
-#     """
-#     retrieve:
-#         根据resourceID获取对应的论文条目
-#     """
-#     queryset = Comment.objects.all()
-#     pagination_class = StandardResultsSetPagination
-#     serializer_class = CommentGetSerializer
-#     lookup
-#
-#     def retrieve(self, request, *args, **kwargs):
-#         paperID = kwargs.get('resourceID')
-#         es = Elasticsearch("127.0.0.1:9200")
-#
-#         ret = es.search(index='papers',
-#                         body={
-#                             "term":{
-#                                 '_id':paperID
-#                             }
-#                         })
-#
-#         instance = self.get_object()
-#         serializer = self.get_serializer(instance)
-#         return Response(serializer.data)
-
 class CommentViewSet(CreateModelMixin,
                      ListModelMixin,
                      viewsets.GenericViewSet):
@@ -182,13 +156,14 @@ class CommentViewSet(CreateModelMixin,
 
 class CollectionViewSet(CreateModelMixin,
                         DestroyModelMixin,
-                        ListModelMixin,
+                        RetrieveModelMixin,
                         viewsets.GenericViewSet):
     """
-
+    用户收藏
     """
     queryset = Collection.objects.all()
     serializer_class = CollectionPostSerializer
+    pagination_class = StandardResultsSetPagination
     lookup_field = 'userID'
 
     def destroy(self, request, *args, **kwargs):
@@ -198,14 +173,46 @@ class CollectionViewSet(CreateModelMixin,
         self.perform_destroy(instance)
         return Response(status=status.HTTP_204_NO_CONTENT)
 
-    # def list(self, request, *args, **kwargs):
-    #     #queryset = self.filter_queryset(self.get_queryset())
-    #     queryset =
-    #
-    #     page = self.paginate_queryset(queryset)
-    #     if page is not None:
-    #         serializer = self.get_serializer(page, many=True)
-    #         return self.get_paginated_response(serializer.data)
-    #
-    #     serializer = self.get_serializer(queryset, many=True)
-    #     return Response(serializer.data)
+    #GET /collections/{userID}/?resType=paper
+    def retrieve(self, request, *args, **kwargs):
+        resType = request.query_params.get('resType')
+        resType = 1 if resType=='paper' else 2
+        collectionSet = Collection.objects.filter(userID=kwargs.get('userID'))
+        queryset = []
+
+        for item in collectionSet:
+            #This item is petent:
+            if len(item.resourceID)<25 and resType==2:
+                ret = es.get(index='patents',id=item.resourceID)
+                item = dict()
+                item['patentID'] = ret['_id']
+                ret = ret['_source']['Patent']
+                item['patentName'] = ret.get('TI')
+                item['rightHolder'] = ret.get('PE')
+                item['summary'] = ret.get('AB')
+                queryset.append(item)
+            #This item is paper
+            elif len(item.resourceID)>25 and resType==1:
+                ret = es.get(index='papers',id=item.resourceID)
+                item = dict()
+                item['paperID'] = ret['_id']
+                ret = ret['_source']
+                item['paperName'] = ret.get('title')
+                item['abstract'] = ret.get('abstract')
+                item['author'] = ret.get('authors')
+                item['authorID'] = ret.get('authorID')
+                queryset.append(item)
+
+        page = self.paginate_queryset(queryset)
+        if resType==1:
+            if page is not None:
+                serializer = PaperGetSerializer(page, many=True)
+                return self.get_paginated_response(serializer.data)
+            serializer = PaperGetSerializer(queryset, many=True)
+            return Response(serializer.data)
+        elif resType==2:
+            if page is not None:
+                serializer = PatentGetSerializer(page,many=True)
+                return self.get_paginated_response(serializer.data)
+            serializer = PatentGetSerializer(queryset,many=True)
+            return Response(serializer.data)
