@@ -5,19 +5,24 @@ from datetime import datetime
 from rest_framework.mixins import CreateModelMixin,RetrieveModelMixin,ListModelMixin,UpdateModelMixin,DestroyModelMixin
 from rest_framework import viewsets,status
 from rest_framework.response import Response
-from rest_framework.pagination import PageNumberPagination
+from rest_framework.views import APIView
 from django.http import JsonResponse,HttpResponse
 from django.core.paginator import Paginator,PageNotAnInteger,EmptyPage
 from django.core import serializers
+import logging
+from django.contrib.auth.models import AnonymousUser
+
 # third-party packges
 from elasticsearch import Elasticsearch
 
 # my-own packages
 from users.views import StandardResultsSetPagination
-from .models import Comment,Collection
+from .models import Comment,Collection,PaperCheckForm
 from .serializers import CommentPostSerializer,CommentGetSerializer,CollectionPostSerializer
-from .serializers import PaperGetSerializer,PatentGetSerializer
+from .serializers import PaperGetSerializer,PatentGetSerializer,PaperCheckFormSerializer
 from .es_connect import es
+
+logger = logging.getLogger()
 
 #GET /paperDetail/{paperID}/
 def paperDetail(request,paperID):
@@ -27,6 +32,13 @@ def paperDetail(request,paperID):
                             'term':{'_id':paperID}
                         }
                     })
+    if isinstance(request.user,AnonymousUser):
+        user = '未登录用户'
+    else:
+        user = request.user.userID
+    logger.info(
+        'time:%s user_id:%s resource_type:paper resource_id:%s' % (datetime.now,user,paperID)
+    )
     paper_item = ret['hits']['hits'][0]['_source']
     if paper_item.get('references') is not None:
         ref = list()
@@ -46,10 +58,62 @@ def patentDetail(request,patentID):
         index='patents',
         id = patentID,
     )
+    if isinstance(request.user, AnonymousUser):
+        user = '未登录用户'
+    else:
+        user = request.user.userID
+    logger.info(
+        'time:%s user_id:%s resource_type:patent resource_id:%s' % (
+        datetime.now, user, patentID)
+    )
     patent_item = ret['_source']['Patent']
     return JsonResponse(patent_item)
 
-#DSL QUERY????
+class PaperView(APIView):
+    def get(self,request,paperID):
+        if isinstance(request.user,AnonymousUser):
+            user = '未登录用户'
+        else:
+            user = request.user.userID
+        logger.info(
+            'userID:%s resType:paper resID:%s' % \
+            (user,paperID)
+        )
+        ret = es.get(
+            index='papers',
+            id=paperID,
+        )
+        paper = ret['_source']
+        if paper.get('references') is not None:
+            ref = list()
+            for item in paper['references']:
+                try:
+                    ret = es.get(index='papers',id=item)
+                except Exception:
+                    continue
+                ref.append((item,ret['_source'].get('title')))
+            paper['references'] = ref
+
+        return JsonResponse(paper)
+
+class PatentView(APIView):
+    def get(self,request,patentID):
+        if isinstance(request.user,AnonymousUser):
+            user = '未登录用户'
+        else:
+            user = request.user.userID
+        logger.info(
+            'userID:%s resType:patent resID:%s' % \
+            (user,patentID)
+        )
+        ret = es.get(
+            index='patents',
+            id=patentID,
+        )
+        patent = ret['_source']['Patent']
+        return JsonResponse(patent,safe=False)
+
+
 #GET /search/papers/?keywords=aaa&page=xxx&pageSize=yyy
 def searchPapers(request):
     keywords = request.GET.get('keywords')
@@ -99,13 +163,10 @@ def searchPapers(request):
     ret['results'] = papers
     return JsonResponse(ret,safe=False)
 
-    # json_data = serializers.serialize("json",papers,ensure_ascii=False)
-    # return HttpResponse(json_data,content_type='applicaiton/json',charset='utf-8')
-
 # GET /search/patents/?keywords=aaa&page=xxx&pageSize=yyy
 def searchPatents(request):
     keywords = request.GET.get('keywords')
-    page = request.GET.get('page',0)
+    page = request.GET.get('page',1)
     pageSize = request.GET.get('pageSize',10)
     ret = es.search(
         index="patents",
@@ -123,7 +184,20 @@ def searchPatents(request):
         }
     )
     ret = ret['hits']['hits']
-    return JsonResponse(ret,safe=False)
+
+    paginator = Paginator(ret, pageSize)
+    try:
+        patents = paginator.page(page)
+    except PageNotAnInteger:
+        patents = paginator.page(pageSize)
+    except EmptyPage:
+        patents = paginator.page(paginator.num_pages)
+    patents = patents.object_list
+    response = dict()
+    response['count'] = paginator.count
+    response['results'] = patents
+    return JsonResponse(response, safe=False)
+
 
 class CommentViewSet(CreateModelMixin,
                      ListModelMixin,
@@ -216,3 +290,42 @@ class CollectionViewSet(CreateModelMixin,
                 return self.get_paginated_response(serializer.data)
             serializer = PatentGetSerializer(queryset,many=True)
             return Response(serializer.data)
+
+class PaperCheckViewSet(CreateModelMixin,
+                        ListModelMixin,
+                        UpdateModelMixin,
+                        viewsets.GenericViewSet):
+    queryset = PaperCheckForm.objects.all()
+    serializer_class = PaperCheckFormSerializer
+    pagination_class = StandardResultsSetPagination
+
+    #管理员查看所有isCheck=False的表单
+    #GET /paperCheck/
+    def list(self, request, *args, **kwargs):
+        queryset = PaperCheckForm.objects.filter(isCheck=False)
+
+        page = self.paginate_queryset(queryset)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(serializer.data)
+
+    def update(self, request, *args, **kwargs):
+        partial = kwargs.pop('partial', False)
+        instance = self.get_object()
+        serializer = self.get_serializer(instance, data=request.data, partial=partial)
+        serializer.is_valid(raise_exception=True)
+        self.perform_update(serializer)
+
+        if serializer.validated_data.get('isPass'):
+            #这里执行paper的插入工作
+            pass
+        
+        if getattr(instance, '_prefetched_objects_cache', None):
+            # If 'prefetch_related' has been applied to a queryset, we need to
+            # forcibly invalidate the prefetch cache on the instance.
+            instance._prefetched_objects_cache = {}
+
+        return Response(serializer.data)

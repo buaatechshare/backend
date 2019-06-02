@@ -147,15 +147,18 @@ USE_TZ = False
 
 STATIC_URL = '/static/'
 
+MEDIA_URL = '/media/'
+MEDIA_ROOT = os.path.join(BASE_DIR,'media')
+
+
 DATABASE_ROUTERS = ['backend.dbRouter.PrimaryReplicaRouter']
 
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (
-        'rest_framework_jwt.authentication.JSONWebTokenAuthentication',
         'rest_framework.authentication.SessionAuthentication',
         'rest_framework.authentication.BasicAuthentication',
+        'rest_framework_jwt.authentication.JSONWebTokenAuthentication',
     ),
-    #'DEFAULT_PAGINATION_CLASS'
 }
 
 JWT_AUTH = {
@@ -177,3 +180,41 @@ CORS_ALLOW_METHODS = (
     'VIEW',
 )
 
+#配置django日志系统，记录用户点击行为GET /resourceID
+import logging
+LOG_PATH = os.path.join(BASE_DIR, 'log')
+if not os.path.isdir(LOG_PATH):
+    os.mkdir(LOG_PATH)
+#创建日志目录
+LOGGING = {
+    # 规定只能这样写
+    'version': 1,
+    # True表示禁用loggers
+    'disable_existing_loggers': False,
+    # 指定文件写入的格式——这里写了两个不同的格式，方便在后面不同情况需要的时候使用
+    'formatters': {
+        'default': {
+            'format': '%(levelno)s %(funcName)s %(asctime)s %(message)s'
+        },
+        'simple': {
+            'format': '%(levelname)s %(module)s %(asctime)s %(message)s'
+        }
+    },
+    'handlers': {
+        'default_handler': {
+            'level': 'DEBUG',
+            # 日志文件指定为多大(5M)， 超过大小(5M)重新命名，然后写新的日志文件
+            'class': 'logging.handlers.RotatingFileHandler',
+            'maxBytes': 5 * 1024 * 1024,
+            # 储存到的文件地址
+            'filename': '%s/log.txt' % LOG_PATH,
+            'formatter': 'default'
+        },
+    },
+    'loggers': {
+        '': {
+            'handlers': ['default_handler'],
+            'level': 'INFO'
+        },
+    },
+}

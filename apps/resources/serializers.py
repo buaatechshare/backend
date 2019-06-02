@@ -8,7 +8,7 @@ from rest_framework.validators import UniqueValidator,UniqueTogetherValidator
 # third-party packges
 
 # my-own packages
-from .models import Comment,Collection
+from .models import Comment,Collection,PaperCheckForm
 from users.serializers import UserInMessageSerializer
 
 
@@ -47,3 +47,11 @@ class CommentGetSerializer(serializers.ModelSerializer):
     # content = models.TextField()
     # rate = models.IntegerField()
     # add_time = models.DateTimeField(default=datetime.now,)
+
+class PaperCheckFormSerializer(serializers.ModelSerializer):
+    id = serializers.IntegerField(read_only=True)
+    add_time = serializers.DateTimeField(read_only=True)
+    
+    class Meta:
+        model = PaperCheckForm
+        fields = '__all__'
