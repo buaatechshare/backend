@@ -11,6 +11,8 @@ from django.core.paginator import Paginator,PageNotAnInteger,EmptyPage
 from django.core import serializers
 # third-party packges
 from elasticsearch import Elasticsearch
+import  elasticsearch_dsl
+from elasticsearch_dsl import search
 
 # my-own packages
 from users.views import StandardResultsSetPagination
@@ -193,3 +195,44 @@ class CollectionViewSet(CreateModelMixin,
         instance = Collection.objects.filter(userID=userID,resourceID=resourceID)
         self.perform_destroy(instance)
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+from users.models import Fields, Tags
+
+
+# 返回推荐论文
+# /papersRec/{userID}
+def get_rec_paper(request, userID):
+    pagenum = int(request.GET['pageNumber'])
+    pagesize = int(request.GET['pageSize'])
+    userid = request.GET['userID']
+    get_field = Tags.objects.filter(userID__exact=userid)
+    arr = []
+    for i in get_field:
+        arr.append({"match":{"fos":str(i.field)}})
+    ret = es.search(
+        index="papers",
+        body={
+            "query": {
+                "bool": {
+                    "minimum_should_match":1,
+                    "should": arr
+                }
+            },
+            "size": pagesize,
+            "from": (pagenum-1)*pagesize,
+        }
+    )
+    ret = ret['hits']['hits']
+    paper_list = []
+    for item in ret:
+        paper_item = dict()
+        paper_item['type'] = item['_type']
+        paper_item['id'] = item['_id']
+        paper_item['citation'] = item['_source'].get('n_citaion')
+        paper_item['author'] = item['_source'].get('authors')
+        paper_item['paperName'] = item['_source'].get('title')
+        paper_item['abstract'] = item['_source'].get('abstract')
+        paper_item['fos'] = item['_source'].get('fos')
+        paper_list.append(paper_item)
+    return JsonResponse(paper_list, safe=False)

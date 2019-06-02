@@ -241,9 +241,8 @@ def get_user_fuzzy_by_name(request, userName):
     name_dict['userName'] = fuzzy_name
     return JsonResponse(name_dict, safe=False)
 
-# 返回推荐论文
-# /papersRec/{userID}
-#def get_rec_paper()
+
+
 
 # 返回推荐专利
 
