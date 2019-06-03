@@ -284,6 +284,7 @@ def get_rec_patent(request, userID):
     con = len(ret)
     for item in ret:
         paper_item = dict()
+        paper_item['rightholder'] = item['_source']['Patent'].get('IN')
         paper_item['patentName'] = item['_source']['Patent'].get('TI')
         paper_item['summary'] = item['_source']['Patent'].get('AB')
         paper_item['resourceID'] = item['_id']
