@@ -253,7 +253,7 @@ def get_rec_patent(request, userID):
     if userid.isspace() or len(userid) == 0:
         seed(datetime.now())
         con = Fields.objects.latest('id').id
-        rand_ids = sample(range(1, con), 40)
+        rand_ids = sample(range(1, con), 100)
         get_field = Fields.objects.filter(id__in=rand_ids)
         for i in get_field:
             if i.type == "paper":
