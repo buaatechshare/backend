@@ -22,7 +22,7 @@ from rest_framework.documentation import include_docs_urls
 from users.views import UserViewSet,MessageViewSet,ExpertCheckViewSet,FollowViewSet
 from users.views import get_user_fuzzy_by_name, FieldViewSet
 from resources.views import CollectionViewSet,CommentViewSet
-from resources.views import paperDetail,patentDetail,searchPapers,searchPatents, get_rec_paper, get_rec_patent
+from resources.views import paperDetail,patentDetail,searchPapers,searchPatents, get_rec_paper, get_rec_patent, get_professors_by_name, get_expert_by_esID
 
 router = DefaultRouter()
 #用户注册register
@@ -65,5 +65,7 @@ urlpatterns = [
     path('search/patents/',searchPatents),
     path('receiver/<str:userName>/', get_user_fuzzy_by_name),
     path('papersRec/<str:userID>/', get_rec_paper),
-    path('patentRec/<str:userID>/', get_rec_patent),
+    path('patentsRec/<str:userID>/', get_rec_patent),
+    path('search/professors/', get_professors_by_name),
+    path('professor/<str:esExpertID>', get_expert_by_esID)
 ]

@@ -1,7 +1,7 @@
 from elasticsearch import Elasticsearch
 from elasticsearch import helpers
 import json
-import time 
+import time
 import uuid
 import os
 
@@ -16,20 +16,29 @@ files= os.listdir(path)
 num_id = 0
 try:
     for filename in files:
-        if filename == 'mag_papers_10.txt':
+        if filename == 'mag_authors_10.txt':
             with open(filename,'r') as fin:
                 s = time.time()
                 actions = []
                 for line in fin:
-                    paper = json.loads(line)
-                    ind = paper['id']
-                    paper.pop('id')
+                    expert = json.loads(line)
+                    ind = expert['id']
+                    expert.pop('id')
                     action = {
-                        "_index": "papers",
-                        "_type": "paper",
-                        "_id": ind,
-                        "_source": paper
+                            "_index": "experts",
+                            "_type": "expert",
+                            "_id": ind,
+                            "_source": expert
                     }
+                    # paper = json.loads(line)
+                    # ind = paper['id']
+                    # paper.pop('id')
+                    # action = {
+                    #     "_index": "papers",
+                    #     "_type": "paper",
+                    #     "_id": ind,
+                    #     "_source": paper
+                    # }
                     actions.append(action)
                     num_id += 1
                     if num_id % 20000 == 0:
@@ -38,7 +47,7 @@ try:
                         e = time.time()
                         print("{} {}s".format(a,e-s))
                     if num_id == 100000:
-                        break
+                         break
                 if len(actions):
                     a = helpers.bulk(es, actions)
                     actions = []
