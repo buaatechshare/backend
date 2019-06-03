@@ -279,34 +279,18 @@ class FieldViewSet(CreateModelMixin,
         questlist['tag'] = selectedfield
         return JsonResponse(questlist)
 
-    #def update(self, request, *args, **kwargs):
-    #    return JsonResponse("[\"fee\"]", safe=False)
-
     # 上传用户领域
-    # POST /field/{userID}
-    # 由于create限制，field参数不能传入数组，因此采用传递数组转成的字符串
+    # POST /field/
     def create(self, request, *args, **kwargs):
         #return JsonResponse(request.data, safe=False)
-
-        #Tags.objects.update_or_create(userID__exact=request.data['userID'])
-        #tag = Tags.objects.get(userID__exact=kwargs['pk'])
-        #tag.field.clear()
-        #for i in request.data['field']:
-        #    tag.field.add(Fields.objects.get(field__exact=i).fieldID)
-        #return JsonResponse("OK", safe=False, status=status.HTTP_201_CREATED)
-
-        str = request.data['field'].replace('{','').replace('}','').replace('[','').replace(']','').replace('"','').replace('\'','')
-        arr = str.split(',')
-
         userid = UserProfile.objects.filter(userID__exact=request.data['userID'])[0]
-
-        for i in arr:
-            if Tags.objects.filter(userID__exact=request.data['userID'], field__exact=i).exists():
-                continue
+        for i in request.data["field"]:
             field = Fields.objects.filter(field__exact=i)[0]
+            if Tags.objects.filter(userID__exact=request.data['userID'], fieldID__exact=field.id).exists():
+                continue
             tag = Tags()
             tag.userID = userid
-            tag.field = field
+            tag.fieldID = field
             tag.save()
         return JsonResponse("OK", safe=False, status=status.HTTP_201_CREATED)
 

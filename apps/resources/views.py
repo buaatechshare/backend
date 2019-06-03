@@ -14,8 +14,11 @@ from elasticsearch import Elasticsearch
 import  elasticsearch_dsl
 from elasticsearch_dsl import search
 
+from random import *
+
 # my-own packages
 from users.views import StandardResultsSetPagination
+from users.models import Fields, Tags
 from .models import Comment,Collection
 from .serializers import CommentPostSerializer,CommentGetSerializer,CollectionPostSerializer
 from .es_connect import es
@@ -197,7 +200,7 @@ class CollectionViewSet(CreateModelMixin,
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
-from users.models import Fields, Tags
+
 
 
 # 返回推荐论文
@@ -205,7 +208,9 @@ from users.models import Fields, Tags
 def get_rec_paper(request, userID):
     pagenum = int(request.GET['pageNumber'])
     pagesize = int(request.GET['pageSize'])
-    userid = request.GET['userID']
+    userid = str(userID)
+    if userid.isspace() or len(userid) == 0:
+        pass
     get_field = Tags.objects.filter(userID__exact=userid)
     arr = []
     for i in get_field:
@@ -233,6 +238,85 @@ def get_rec_paper(request, userID):
         paper_item['author'] = item['_source'].get('authors')
         paper_item['paperName'] = item['_source'].get('title')
         paper_item['abstract'] = item['_source'].get('abstract')
-        paper_item['fos'] = item['_source'].get('fos')
+        #paper_item['fos'] = item['_source'].get('fos')
         paper_list.append(paper_item)
     return JsonResponse(paper_list, safe=False)
+
+
+# 返回推荐专利
+# /patentsRec/{userID}
+def get_rec_patent(request, userID):
+    pagenum = int(request.GET['pageNumber'])
+    pagesize = int(request.GET['pageSize'])
+    userid = str(userID)
+    arr = []
+    if userid.isspace() or len(userid) == 0:
+        seed(datetime.now())
+        con = Fields.objects.latest('id').id
+        rand_ids = sample(range(1, con), 40)
+        get_field = Fields.objects.filter(id__in=rand_ids)
+        for i in get_field:
+            if i.type == "paper":
+                continue
+            arr.append({"match_phrase_prefix": {"Patent.IC": {"query":i.fieldID, "max_expansions": 10}}})
+        #return JsonResponse(arr , safe=False)
+    else:
+        get_field = Tags.objects.filter(userID__exact=userid)
+        for i in get_field:
+            if i.fieldID.type == "paper":
+                continue
+            arr.append({"match_phrase_prefix": {"Patent.IC": {"query":i.fieldID.fieldID, "max_expansions": 10}}})
+    ret = es.search(
+        index="patents",
+        body={
+            "query": {
+                "bool": {
+                    "minimum_should_match": 1,
+                    "should": arr
+                }
+            },
+            "size": pagesize,
+            "from": (pagenum - 1) * pagesize,
+        }
+    )
+    ret = ret['hits']['hits']
+    paper_list = []
+    con = len(ret)
+    for item in ret:
+        paper_item = dict()
+        paper_item['patentName'] = item['_source']['Patent'].get('TI')
+        paper_item['summary'] = item['_source']['Patent'].get('AB')
+        paper_item['resourceID'] = item['_id']
+        paper_list.append(paper_item)
+    ret = dict()
+    ret['count'] = con
+    ret['results'] = paper_list
+    return JsonResponse(ret, safe=False)
+
+
+'''
+ret = ret['hits']['hits']
+    paper_list = []
+    for item in ret:
+        paper_item = dict()
+        paper_item['type'] = item['_type']
+        paper_item['id'] = item['_id']
+        paper_item['citation'] = item['_source'].get('n_citaion')
+        paper_item['author'] = item['_source'].get('authors')
+        paper_item['paperName'] = item['_source'].get('title')
+        paper_item['abstract'] = item['_source'].get('abstract')
+        paper_list.append(paper_item)
+
+    paginator = Paginator(paper_list,pageSize)
+    try:
+        papers = paginator.page(page)
+    except PageNotAnInteger:
+        papers = paginator.page(pageSize)
+    except EmptyPage:
+        papers = paginator.page(paginator.num_pages)
+    papers = papers.object_list
+    ret = dict()
+    ret['count'] = paginator.count
+    ret['results'] = papers
+    return JsonResponse(ret,safe=False)
+'''

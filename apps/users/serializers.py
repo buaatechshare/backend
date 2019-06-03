@@ -118,7 +118,7 @@ class FieldsSerializer(serializers.ModelSerializer):
 
 class TagSerializer(serializers.ModelSerializer):
     userID = serializers.IntegerField()
-    field = serializers.CharField()
+    field = serializers.IntegerField()
 
     class Meta:
         model = Tags
