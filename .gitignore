@@ -1,1 +1,5 @@
 .idea
+*~
+.DS_Store
+/extra_apps/OAG_APIs/Ocp_key.py
+*.pyc
