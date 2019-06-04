@@ -48,6 +48,12 @@ class CommentGetSerializer(serializers.ModelSerializer):
     # rate = models.IntegerField()
     # add_time = models.DateTimeField(default=datetime.now,)
 
+class PaperCheckPostSerializer(serializers.ModelSerializer):
+    add_time = serializers.DateTimeField(read_only=True)
+    class Meta:
+        model = PaperCheckForm
+        fields = ('userID','title','author','doi','abstract','file','add_time')
+
 class PaperCheckFormSerializer(serializers.ModelSerializer):
     id = serializers.IntegerField(read_only=True)
     add_time = serializers.DateTimeField(read_only=True)

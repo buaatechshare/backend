@@ -19,57 +19,91 @@ from elasticsearch import Elasticsearch
 from users.views import StandardResultsSetPagination
 from .models import Comment,Collection,PaperCheckForm
 from .serializers import CommentPostSerializer,CommentGetSerializer,CollectionPostSerializer
-from .serializers import PaperGetSerializer,PatentGetSerializer,PaperCheckFormSerializer
+from .serializers import PaperCheckPostSerializer,PaperGetSerializer,PatentGetSerializer,PaperCheckFormSerializer
 from .es_connect import es
+from OAG_APIs.get_Methods import get_Reference,get_abstract,get_FoS
 
 logger = logging.getLogger()
 
-#GET /paperDetail/{paperID}/
-def paperDetail(request,paperID):
-    ret = es.search(index='papers',
-                    body={
-                        'query':{
-                            'term':{'_id':paperID}
-                        }
-                    })
-    if isinstance(request.user,AnonymousUser):
-        user = '未登录用户'
-    else:
-        user = request.user.userID
-    logger.info(
-        'time:%s user_id:%s resource_type:paper resource_id:%s' % (datetime.now,user,paperID)
-    )
-    paper_item = ret['hits']['hits'][0]['_source']
-    if paper_item.get('references') is not None:
-        ref = list()
-        for item in paper_item['references']:
-            try:
-                ret = es.get(index='papers', id=item)
-            except Exception:
-                continue
-            ref.append((item,ret['_source'].get('title')))
-        paper_item['references'] = ref
+# #GET /paperDetail/?paperID=xxx
+# def paperDetail(request):
+#     paperID = request.GET.get('paperID')
+#     ret = es.search(index='papers',
+#                     body={
+#                         'query':{
+#                             'term':{'_id':paperID}
+#                         }
+#                     })
+#     if isinstance(request.user,AnonymousUser):
+#         user = '未登录用户'
+#     else:
+#         user = request.user.userID
+#     logger.info(
+#         'time:%s user_id:%s resource_type:paper resource_id:%s' % (datetime.now,user,paperID)
+#     )
+#     paper_item = ret['hits']['hits'][0]['_source']
+#     if paper_item.get('references') is not None:
+#         ref = list()
+#         for item in paper_item['references']:
+#             try:
+#                 ret = es.get(index='papers', id=item)
+#             except Exception:
+#                 continue
+#             ref.append((item,ret['_source'].get('title')))
+#         paper_item['references'] = ref
+#
+#     return JsonResponse(paper_item)
 
-    return JsonResponse(paper_item)
 
-#GET /patentDetail/{patentID}/
-def patentDetail(request,patentID):
-    ret = es.get(
-        index='patents',
-        id = patentID,
-    )
-    if isinstance(request.user, AnonymousUser):
-        user = '未登录用户'
-    else:
-        user = request.user.userID
-    logger.info(
-        'time:%s user_id:%s resource_type:patent resource_id:%s' % (
-        datetime.now, user, patentID)
-    )
-    patent_item = ret['_source']['Patent']
-    return JsonResponse(patent_item)
+
+# # GET /patentDetail/?patentID=xxx
+# def patentDetail(request):
+#     patentID = request.GET.get('patentID')
+#     ret = es.get(
+#         index='patents',
+#         id = patentID,
+#     )
+#     if isinstance(request.user, AnonymousUser):
+#         user = '未登录用户'
+#     else:
+#         user = request.user.userID
+#     logger.info(
+#         'time:%s user_id:%s resource_type:patent resource_id:%s' % (
+#         datetime.now, user, patentID)
+#     )
+#     #patent_item = ret['_source']['Patent']
+#     patent_item = ret['_source']
+#     return JsonResponse(patent_item)
 
 class PaperView(APIView):
+    # GET /paperDetail/{paperID}/
+    def get(self,request,paperID):
+        if isinstance(request.user,AnonymousUser):
+            user = '未登录用户'
+        else:
+            user = request.user.userID
+        logger.info(
+            'userID:%s resType:paper resID:%s' % \
+            (user,paperID)
+        )
+        ret = es.get(
+            index='papers',
+            id=paperID,
+        )
+        paper = ret['_source']
+        if paper.get('references') is not None:
+            ref = list()
+            for item in paper['references']:
+                try:
+                    ret = es.get(index='papers',id=item)
+                except Exception:
+                    continue
+                ref.append((item,ret['_source'].get('title')))
+            paper['references'] = ref
+
+        return JsonResponse(paper)
+
+# GET /paperDetail/{paperID}/
     def get(self,request,paperID):
         if isinstance(request.user,AnonymousUser):
             user = '未登录用户'
@@ -110,15 +144,16 @@ class PatentView(APIView):
             index='patents',
             id=patentID,
         )
-        patent = ret['_source']['Patent']
+        # patent = ret['_source']['Patent']
+        patent = ret['_source']
         return JsonResponse(patent,safe=False)
 
 
 #GET /search/papers/?keywords=aaa&page=xxx&pageSize=yyy
 def searchPapers(request):
     keywords = request.GET.get('keywords')
-    page = request.GET.get('page',1)
-    pageSize = request.GET.get('pageSize',10)
+    page = int(request.GET.get('page',1))
+    pageSize = int(request.GET.get('pageSize',10))
     ret = es.search(
         index="papers",
         body={
@@ -127,14 +162,16 @@ def searchPapers(request):
                     "query": keywords,
                     "fields": [
                         "title",
-                        "abstract",
-                        "keywords",
-                        "fos"
+                        "author.name"
                     ]
                 }
-            }
+            },
+            "size": pageSize,
+            "from": (page - 1) * pageSize,
         }
     )
+    response = dict()
+    response['count'] = ret['hits']['total']['value']
     # 1.将所有内容直接返回
     # paper_list = ret['hits']['hits']
     # 2.将结果整理后返回
@@ -150,24 +187,23 @@ def searchPapers(request):
         paper_item['abstract'] = item['_source'].get('abstract')
         paper_list.append(paper_item)
 
-    paginator = Paginator(paper_list,pageSize)
-    try:
-        papers = paginator.page(page)
-    except PageNotAnInteger:
-        papers = paginator.page(pageSize)
-    except EmptyPage:
-        papers = paginator.page(paginator.num_pages)
-    papers = papers.object_list
-    ret = dict()
-    ret['count'] = paginator.count
-    ret['results'] = papers
-    return JsonResponse(ret,safe=False)
+    # paginator = Paginator(paper_list,pageSize)
+    # try:
+    #     papers = paginator.page(page)
+    # except PageNotAnInteger:
+    #     papers = paginator.page(pageSize)
+    # except EmptyPage:
+    #     papers = paginator.page(paginator.num_pages)
+    # papers = papers.object_list
+
+    response['results'] = paper_list
+    return JsonResponse(response,safe=False)
 
 # GET /search/patents/?keywords=aaa&page=xxx&pageSize=yyy
 def searchPatents(request):
     keywords = request.GET.get('keywords')
-    page = request.GET.get('page',1)
-    pageSize = request.GET.get('pageSize',10)
+    page = int(request.GET.get('page',1))
+    pageSize = int(request.GET.get('pageSize',10))
     ret = es.search(
         index="patents",
         body={
@@ -175,27 +211,21 @@ def searchPatents(request):
                 "multi_match":{
                     "query":keywords,
                     "fields":[
-                        "Patent.TI",
-                        "Patent.AB",
-                        "Patent.CL"
+                        "TI",
+                        "AB",
+                        "CL"
                     ]
                 }
-            }
+            },
+            "size": pageSize,
+            "from": (page - 1) * pageSize,
         }
     )
+    response = dict()
+    response['count'] = ret['hits']['total']['value']
     ret = ret['hits']['hits']
 
-    paginator = Paginator(ret, pageSize)
-    try:
-        patents = paginator.page(page)
-    except PageNotAnInteger:
-        patents = paginator.page(pageSize)
-    except EmptyPage:
-        patents = paginator.page(paginator.num_pages)
-    patents = patents.object_list
-    response = dict()
-    response['count'] = paginator.count
-    response['results'] = patents
+    response['results'] = ret
     return JsonResponse(response, safe=False)
 
 
@@ -255,18 +285,19 @@ class CollectionViewSet(CreateModelMixin,
         queryset = []
 
         for item in collectionSet:
-            #This item is petent:
-            if len(item.resourceID)<25 and resType==2:
+            #This item is patent:
+            if len(item.resourceID)>=20 and resType==2:
                 ret = es.get(index='patents',id=item.resourceID)
                 item = dict()
                 item['patentID'] = ret['_id']
-                ret = ret['_source']['Patent']
+                # ret = ret['_source']['Patent']
+                ret = ret['_source']
                 item['patentName'] = ret.get('TI')
                 item['rightHolder'] = ret.get('PE')
                 item['summary'] = ret.get('AB')
                 queryset.append(item)
             #This item is paper
-            elif len(item.resourceID)>25 and resType==1:
+            elif len(item.resourceID)<20 and resType==1:
                 ret = es.get(index='papers',id=item.resourceID)
                 item = dict()
                 item['paperID'] = ret['_id']
@@ -296,8 +327,12 @@ class PaperCheckViewSet(CreateModelMixin,
                         UpdateModelMixin,
                         viewsets.GenericViewSet):
     queryset = PaperCheckForm.objects.all()
-    serializer_class = PaperCheckFormSerializer
     pagination_class = StandardResultsSetPagination
+
+    def get_serializer_class(self):
+        if self.action == 'create':
+            return PaperCheckPostSerializer
+        return PaperCheckFormSerializer
 
     #管理员查看所有isCheck=False的表单
     #GET /paperCheck/
@@ -320,7 +355,16 @@ class PaperCheckViewSet(CreateModelMixin,
         self.perform_update(serializer)
 
         if serializer.validated_data.get('isPass'):
-            #这里执行paper的插入工作
+            user = serializer.validated_data.get('userID')
+            title = serializer.validated_data.get('title')
+            author = serializer.validated_data.get('author')
+            doi = serializer.validated_data.get('doi')
+            abstract = serializer.validated_data.get('abstract')
+            file = serializer.validated_data.get('')
+
+            paperEntity = dict()
+            paperID = int()
+
             pass
         
         if getattr(instance, '_prefetched_objects_cache', None):
@@ -329,3 +373,4 @@ class PaperCheckViewSet(CreateModelMixin,
             instance._prefetched_objects_cache = {}
 
         return Response(serializer.data)
+

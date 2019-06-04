@@ -15,16 +15,14 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import path,include
-from rest_framework_jwt.views import obtain_jwt_token
+#from rest_framework_jwt.views import obtain_jwt_token
 from rest_framework.routers import DefaultRouter
 from rest_framework.documentation import include_docs_urls
 
 from users.views import UserViewSet,MessageViewSet,ExpertCheckViewSet,FollowViewSet
-from resources.views import CollectionViewSet,CommentViewSet,PaperCheckViewSet
-from resources.views import paperDetail,PatentView,searchPapers,searchPatents,PaperView
-from users.views import get_user_fuzzy_by_name, FieldViewSet
-from resources.views import CollectionViewSet,CommentViewSet
-from resources.views import paperDetail,patentDetail,searchPapers,searchPatents
+from resources.views import PaperCheckViewSet,CollectionViewSet,CommentViewSet,searchPapers,searchPatents
+from resources.views import PatentView,PaperView
+from users.views import get_user_fuzzy_by_name,MyJSONWebTokenAPIView
 
 router = DefaultRouter()
 #用户注册register
@@ -52,13 +50,13 @@ router.register('paperCheck',PaperCheckViewSet,base_name='paperCheck')
 # router.register('papers',PaperViewSet,base_name='paper')
 
 #用户领域
-router.register('field', FieldViewSet, base_name='fields')
+#router.register('field', FieldViewSet, base_name='fields')
 
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('api-auth/',include('rest_framework.urls')),
     #用户登录
-    path('login/', obtain_jwt_token),
+    path('login/', MyJSONWebTokenAPIView.as_view()),
     #router注册的url
     path('',include(router.urls)),
     #drf自带文档管理

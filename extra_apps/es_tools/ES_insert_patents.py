@@ -21,7 +21,7 @@ try:
                 s = time.time()
                 actions = []
                 for line in fin:
-                    patent = json.loads(line)
+                    patent = json.loads(line)["Patent"]
                     # ind = paper['id']
                     # paper.pop('id')
                     action = {
@@ -37,6 +37,8 @@ try:
                         actions = []
                         e = time.time()
                         print("{} {}s".format(a,e-s))
+                    # if num_id == 100000:
+                    #     break
                 if len(actions):
                     a = helpers.bulk(es, actions)
                     actions = []

@@ -4,18 +4,24 @@ from datetime import datetime
 # django&restframework packges
 from rest_framework.mixins import CreateModelMixin,RetrieveModelMixin,ListModelMixin,UpdateModelMixin,DestroyModelMixin
 from rest_framework import viewsets,status
+from rest_framework.status import HTTP_500_INTERNAL_SERVER_ERROR
 from rest_framework.response import Response
 from rest_framework.pagination import PageNumberPagination
 from django.http import JsonResponse, HttpResponse
 
 # third-party packges
 from rest_framework_jwt.serializers import jwt_encode_handler, jwt_payload_handler
-
+from rest_framework_jwt.views import JSONWebTokenAPIView
+from rest_framework_jwt.views import api_settings
+from rest_framework_jwt.serializers import JSONWebTokenSerializer
+from elasticsearch import helpers
+from resources.es_connect import es
 # my-own packages
 from .serializers import UserRegSerializer,MessageGetSerializer,MessagePostSerializer,FollowGetSerializer,FollowPostSerializer,UserDetailSerializer,UserUpdateSerializer
 from .serializers import ExpertApplySerializer,ExpertCheckSerializer
-from .serializers import FieldsSerializer, TagSerializer
-from .models import UserProfile,Message,Follow,ExpertCheckForm,ExpertProfile, Fields, Tags
+from .serializers import FieldsSerializer
+from .models import UserProfile,Message,Follow,ExpertCheckForm,ExpertProfile, Fields
+from backend.settings import EXPERT_OFFSET
 
 # Create your views here.
 
@@ -94,7 +100,7 @@ class MessageViewSet(CreateModelMixin,
         elif receiverID:
             queryset = Message.objects.filter(receiverID=receiverID)
         else:
-            queryset = []
+            queryset = Message.objects.all()
         page = self.paginate_queryset(queryset)
         if page is not None:
             serializer = self.get_serializer(page, many=True)
@@ -201,7 +207,7 @@ class ExpertCheckViewSet(CreateModelMixin,
         return Response(serializer.data)
 
     #管理员审核（更新）表单
-    #PUT/PATCH /applications/{formID}
+    #PUT/PATCH /application/{formID}
     def update(self, request, *args, **kwargs):
         partial = kwargs.pop('partial', False)
         instance = self.get_object()
@@ -210,6 +216,7 @@ class ExpertCheckViewSet(CreateModelMixin,
         self.perform_update(serializer)
 
         if serializer.validated_data.get('isPass'):
+            expertID = serializer.validated_data.get('expertID')
             user = serializer.validated_data.get('userID')
             introduction = serializer.validated_data.get('introduction')
             constitution = serializer.validated_data.get('constitution')
@@ -219,8 +226,35 @@ class ExpertCheckViewSet(CreateModelMixin,
             user.isExpert=True
             user.save()
 
-            expert = ExpertProfile(user=user,introduction=introduction,constitution=constitution,realName=realName)
+            expertEntity = dict()
+            if not expertID:
+                expertID = int(user.userID)+EXPERT_OFFSET
+                expertEntity["id"]=expertID
+                expertEntity["name"]=realName
+                expertEntity["normalized_name"]=realName
+                expertEntity["pubs"]=[]
+                expertEntity["n_pubs"]=0
+                expertEntity["n_citation"]=0
+            else:
+                # update authors info in ES
+                expertEntity=es.get(index="authors",id=expertID)["_source"]
+            expert = ExpertProfile(expertID=str(expertID),user=user,introduction=introduction,constitution=constitution,realName=realName)
             expert.save()
+
+            #向es.authors插入专家数据
+            try:
+                action = {
+                    "_index": "authors",
+                    "_type": "author",
+                    "_id": expertID,
+                    "_source": expertEntity
+                }
+                a = helpers.bulk(es, [action])
+            except Exception:
+                user.isExpert = False
+                user.save()
+                expert.delete()
+                return Response(status=HTTP_500_INTERNAL_SERVER_ERROR)
 
         if getattr(instance, '_prefetched_objects_cache', None):
             # If 'prefetch_related' has been applied to a queryset, we need to
@@ -229,72 +263,124 @@ class ExpertCheckViewSet(CreateModelMixin,
 
         return Response(serializer.data)
 
+def jwt_response_payload_handler(token, user=None, request=None):
+    """
+    Returns the response data for both the login and refresh views.
+    Override to return a custom response such as including the
+    serialized representation of the User.
+
+    Example:
+
+    def jwt_response_payload_handler(token, user=None, request=None):
+        return {
+            'token': token,
+            'user': UserSerializer(user, context={'request': request}).data
+        }
+
+    """
+    return {
+        'token': token,
+        'userID': user.userID,
+        'name': user.name,
+        'isExpert': user.isExpert,
+    }
+
+class MyJSONWebTokenAPIView(JSONWebTokenAPIView):
+    serializer_class = JSONWebTokenSerializer
+    def post(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+
+        if serializer.is_valid():
+            #管理员登录
+            if request.data['isAdmin']:
+                if serializer.validated_data.get('user').isAdmin == False:
+                    return Response(serializer.errors,
+                                    status=status.HTTP_400_BAD_REQUEST)
+
+            user = serializer.object.get('user') or request.user
+            token = serializer.object.get('token')
+            response_data = jwt_response_payload_handler(token, user, request)
+            response = Response(response_data)
+            if api_settings.JWT_AUTH_COOKIE:
+                expiration = (datetime.utcnow() +
+                              api_settings.JWT_EXPIRATION_DELTA)
+                response.set_cookie(api_settings.JWT_AUTH_COOKIE,
+                                    token,
+                                    expires=expiration,
+                                    httponly=True)
+            return response
+
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 #返回用户名的模糊查询
-#receiver/<str:userName>/
+#GET /receiver/{userName}/
 def get_user_fuzzy_by_name(request, userName):
-    fuzzy_name_set = UserProfile.objects.filter(name__istartswith=userName)[:10]
+    fuzzy_name_set = UserProfile.objects.filter(name__icontains=userName)[:10]
     fuzzy_name = []
     for i in fuzzy_name_set:
-        fuzzy_name.append(i.name)
+        fuzzy_name.append((i.name,i.userID))
     name_dict = dict()
-    name_dict['userName'] = fuzzy_name
+    name_dict['user'] = fuzzy_name
     return JsonResponse(name_dict, safe=False)
 
 
-class FieldViewSet(CreateModelMixin,
-                         ListModelMixin,
-                         UpdateModelMixin,
-                         RetrieveModelMixin,
-                         viewsets.GenericViewSet):
-    def get_queryset(self):
-        if self.action == 'get' or self.action == 'list':
-            return Fields.objects.all()
-        elif self.action == 'post':
-            return Tags.objects.all()
-        return  Tags.objects.all()
-
-    def get_serializer_class(self, *args, **kwargs):
-        if self.action == 'get' or self.action == 'list':
-            return FieldsSerializer
-        elif self.action == 'update' or self.action == 'partial_update':
-            return TagSerializer
-        return  TagSerializer
-
-    # 查看所有符合输入的关键词
-    # GET /field ?keywords=
-    def list(self, request, *args, **kwargs):
-        queryset = Fields.objects.filter(field__icontains=request.GET.get('keywords', ''))[:500]
-        queryset = self.filter_queryset(queryset)
-        selectedfield = []
-        for i in queryset:
-            selectedfield.append(i.field)
-        questlist = dict()
-        questlist['tag'] = selectedfield
-        return JsonResponse(questlist)
-
-    #def update(self, request, *args, **kwargs):
-    #    return JsonResponse("[\"fee\"]", safe=False)
-
-    # 上传用户领域
-    # PUT /field/{userID}
-    def update(self, request, *args, **kwargs):
-        #data = dict()
-        #data['pk'] = int(kwargs['pk'])
-        #data['field'] = request.data['field']
-        #return JsonResponse(request.data['field'], safe=False)
-        #serializer = self.get_serializer(data=request.data)
-        #serializer.is_valid(raise_exception=True)
-        #self.perform_create(serializer)
-        #headers = self.get_success_headers(serializer.data)
-        #return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
-
-        Tags.objects.update_or_create(userID__exact=kwargs['pk'])
-        tag = Tags.objects.get(userID__exact=kwargs['pk'])
-        tag.field.clear()
-        for i in request.data['field']:
-            tag.field.add(Fields.objects.get(field__exact=i).fieldID)
-        return JsonResponse("OK", safe=False, status=status.HTTP_201_CREATED)
+# class FieldViewSet(CreateModelMixin,
+#                    ListModelMixin,
+#                    UpdateModelMixin,
+#                    RetrieveModelMixin,
+#                    viewsets.GenericViewSet):
+#
+#     def get_queryset(self):
+#         if self.action == 'get' or self.action == 'list':
+#             return Fields.objects.all()
+#         elif self.action == 'post':
+#             return Tags.objects.all()
+#         return  Tags.objects.all()
+#
+#     def get_serializer_class(self, *args, **kwargs):
+#         if self.action == 'get' or self.action == 'list':
+#             return FieldsSerializer
+#         elif self.action=='create' or self.action == 'update' or self.action == 'partial_update':
+#             return TagSerializer
+#         return  TagSerializer
+#
+#     # 查看所有符合输入的关键词
+#     # GET /field/?keywords=xxx
+#     def list(self, request, *args, **kwargs):
+#         queryset = Fields.objects.filter(field__icontains=request.query_params.get('keywords', ''))[:50]
+#         selectedfield = []
+#         for i in queryset:
+#             selectedfield.append(i.field)
+#         questlist = dict()
+#         questlist['tag'] = selectedfield
+#         return JsonResponse(questlist)
+#
+#     def create(self, request, *args, **kwargs):
+#         serializer = self.get_serializer(data=request.data)
+#         serializer.is_valid(raise_exception=True)
+#         self.perform_create(serializer)
+#         headers = self.get_success_headers(serializer.data)
+#         return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
+#
+#     # 上传用户领域
+#     # PUT /field/{userID}
+#     def update(self, request, *args, **kwargs):
+#         #data = dict()
+#         #data['pk'] = int(kwargs['pk'])
+#         #data['field'] = request.data['field']
+#         #return JsonResponse(request.data['field'], safe=False)
+#         #serializer = self.get_serializer(data=request.data)
+#         #serializer.is_valid(raise_exception=True)
+#         #self.perform_create(serializer)
+#         #headers = self.get_success_headers(serializer.data)
+#         #return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
+#
+#         Tags.objects.update_or_create(userID__exact=kwargs['pk'])
+#         tag = Tags.objects.get(userID__exact=kwargs['pk'])
+#         tag.field.clear()
+#         for i in request.data['field']:
+#             tag.field.add(Fields.objects.get(field__exact=i).fieldID)
+#         return JsonResponse("OK", safe=False, status=status.HTTP_201_CREATED)
 
 
 

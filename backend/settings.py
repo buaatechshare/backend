@@ -162,6 +162,7 @@ REST_FRAMEWORK = {
 }
 
 JWT_AUTH = {
+    #这个配置项指向了错误/不合适的位置
     'JWT_RESPONSE_PAYLOAD_HANDLER':'users.utils.jwt_response_payload_handler',
     'JWT_EXPIRATION_DELTA': datetime.timedelta(days=7),
 }
@@ -218,3 +219,5 @@ LOGGING = {
         },
     },
 }
+
+EXPERT_OFFSET = 9000000000000

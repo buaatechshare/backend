@@ -4,6 +4,7 @@ from datetime import datetime
 # django&restframework packges
 from django.db import models
 from django.contrib.auth.models import AbstractUser
+from backend.settings import EXPERT_OFFSET
 
 # third-party packges
 
@@ -23,6 +24,7 @@ class UserProfile(AbstractUser):
     phone = models.CharField(unique=True,max_length=11,default='',verbose_name='电话')
     isExpert = models.BooleanField(default=False,verbose_name='是否专家')
     email = models.EmailField(unique=True,verbose_name='邮箱')
+    isAdmin = models.BooleanField(default=False,verbose_name='是否为管理员')
     user_add_time = models.DateTimeField(default=datetime.now,verbose_name='添加时间')
 
     class Meta:
@@ -40,6 +42,7 @@ class ExpertProfile(models.Model):
     introduction = models.TextField(blank=True,null=True,verbose_name='自我介绍')
     constitution = models.CharField(max_length=255,blank=True,null=True,verbose_name='所在机构')
     realName = models.CharField(max_length=255,verbose_name='真实姓名')
+    expertID = models.CharField(default=str(EXPERT_OFFSET),max_length=255,verbose_name='专家在ES中的id')
     expert_add_time = models.DateTimeField(default=datetime.now,verbose_name='添加时间')
     #所在领域field
     #field = models.ForeignKey()
@@ -110,6 +113,7 @@ class ExpertCheckForm(models.Model):
     introduction = models.TextField(verbose_name='个人简介')
     constitution = models.CharField(max_length=255,verbose_name='所在机构')
     realName = models.CharField(max_length=255,verbose_name='真实姓名')
+    expertID = models.CharField(null=True,max_length=255,verbose_name='专家在ES中的id')
     add_time = models.DateTimeField(default=datetime.now,verbose_name='申请时间')
 
     class Meta:
@@ -148,16 +152,16 @@ class Fields(models.Model):
         return self.field
 
 
-class Tags(models.Model):
-    userID = models.ForeignKey(UserProfile, primary_key=True, to_field='userID', on_delete=models.CASCADE, verbose_name='用户ID')
-    field = models.ManyToManyField(Fields)
-
-    class Meta:
-        verbose_name = '用户领域表单'
-        verbose_name_plural = verbose_name
-
-    def __str__(self):
-        return self.userID
+# class Tags(models.Model):
+#     userID = models.ForeignKey(UserProfile, to_field='userID', on_delete=models.CASCADE, verbose_name='用户ID')
+#     field = models.ManyToManyField(Fields)
+#
+#     class Meta:
+#         verbose_name = '用户领域表单'
+#         verbose_name_plural = verbose_name
+#
+#     def __str__(self):
+#         return self.userID
 
 
 #class UserField(models.Model):

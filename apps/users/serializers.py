@@ -8,7 +8,7 @@ from rest_framework.validators import UniqueValidator,UniqueTogetherValidator
 # third-party packges
 
 # my-own packages
-from .models import UserProfile,Message,Follow,ExpertCheckForm,ExpertProfile, Fields, Tags
+from .models import UserProfile,Message,Follow,ExpertCheckForm,ExpertProfile, Fields
 
 class UserDetailSerializer(serializers.ModelSerializer):
     class Meta:
@@ -16,16 +16,18 @@ class UserDetailSerializer(serializers.ModelSerializer):
         fields = ('name','phone','email','user_add_time')
 
 class UserUpdateSerializer(serializers.ModelSerializer):
-    password = serializers.CharField(write_only=True)
     def update(self, instance, validated_data):
         instance = super(UserUpdateSerializer,self).update(instance=instance,validated_data=validated_data)
-        instance.set_password(validated_data['password'])
         instance.save()
         return instance
 
+    def validate(self, attrs):
+        attrs['username'] = attrs['email']
+        return attrs
+
     class Meta:
         model = UserProfile
-        fields = ('name','password')
+        fields = ('name','email')
 
 class UserRegSerializer(serializers.ModelSerializer):
     name = serializers.CharField(label='用户名',required=True,allow_blank=False)
@@ -54,7 +56,7 @@ class UserRegSerializer(serializers.ModelSerializer):
 class UserInMessageSerializer(serializers.ModelSerializer):
     class Meta:
         model = UserProfile
-        fields = ('name',)
+        fields = ('name','userID')
 
 class MessageGetSerializer(serializers.ModelSerializer):
     add_time = serializers.DateTimeField(read_only=True)
@@ -102,7 +104,7 @@ class ExpertApplySerializer(serializers.ModelSerializer):
 
     class Meta:
         model = ExpertCheckForm
-        fields = ('formID','userID','introduction','constitution','realName')
+        fields = ('expertID','formID','userID','introduction','constitution','realName')
 
 class ExpertCheckSerializer(serializers.ModelSerializer):
     class Meta:
@@ -115,8 +117,8 @@ class FieldsSerializer(serializers.ModelSerializer):
         model = Fields
         fields = '__all__'
 
-class TagSerializer(serializers.ModelSerializer):
-    userID = serializers.IntegerField(read_only=True)
-    class Meta:
-        model = Tags
-        fields = '__all__'
+# class TagSerializer(serializers.ModelSerializer):
+#     #userID = serializers.IntegerField(read_only=True)
+#     class Meta:
+#         model = Tags
+#         fields = '__all__'

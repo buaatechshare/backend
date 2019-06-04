@@ -25,20 +25,11 @@ try:
                     ind = expert['id']
                     expert.pop('id')
                     action = {
-                            "_index": "experts",
-                            "_type": "expert",
+                            "_index": "authors",
+                            "_type": "author",
                             "_id": ind,
                             "_source": expert
                     }
-                    # paper = json.loads(line)
-                    # ind = paper['id']
-                    # paper.pop('id')
-                    # action = {
-                    #     "_index": "papers",
-                    #     "_type": "paper",
-                    #     "_id": ind,
-                    #     "_source": paper
-                    # }
                     actions.append(action)
                     num_id += 1
                     if num_id % 20000 == 0:
@@ -46,8 +37,8 @@ try:
                         actions = []
                         e = time.time()
                         print("{} {}s".format(a,e-s))
-                    # if num_id == 100000:
-                    #     break
+                    if num_id == 100000:
+                        break
                 if len(actions):
                     a = helpers.bulk(es, actions)
                     actions = []
