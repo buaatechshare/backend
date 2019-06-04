@@ -100,7 +100,7 @@ class MessageViewSet(CreateModelMixin,
         elif receiverID:
             queryset = Message.objects.filter(receiverID=receiverID)
         else:
-            queryset = Message.objects.all()
+            queryset = []
         page = self.paginate_queryset(queryset)
         if page is not None:
             serializer = self.get_serializer(page, many=True)
@@ -324,65 +324,69 @@ def get_user_fuzzy_by_name(request, userName):
     return JsonResponse(name_dict, safe=False)
 
 
-# class FieldViewSet(CreateModelMixin,
-#                    ListModelMixin,
-#                    UpdateModelMixin,
-#                    RetrieveModelMixin,
-#                    viewsets.GenericViewSet):
-#
-#     def get_queryset(self):
-#         if self.action == 'get' or self.action == 'list':
-#             return Fields.objects.all()
-#         elif self.action == 'post':
-#             return Tags.objects.all()
-#         return  Tags.objects.all()
-#
-#     def get_serializer_class(self, *args, **kwargs):
-#         if self.action == 'get' or self.action == 'list':
-#             return FieldsSerializer
-#         elif self.action=='create' or self.action == 'update' or self.action == 'partial_update':
-#             return TagSerializer
-#         return  TagSerializer
-#
-#     # 查看所有符合输入的关键词
-#     # GET /field/?keywords=xxx
-#     def list(self, request, *args, **kwargs):
-#         queryset = Fields.objects.filter(field__icontains=request.query_params.get('keywords', ''))[:50]
-#         selectedfield = []
-#         for i in queryset:
-#             selectedfield.append(i.field)
-#         questlist = dict()
-#         questlist['tag'] = selectedfield
-#         return JsonResponse(questlist)
-#
-#     def create(self, request, *args, **kwargs):
-#         serializer = self.get_serializer(data=request.data)
-#         serializer.is_valid(raise_exception=True)
-#         self.perform_create(serializer)
-#         headers = self.get_success_headers(serializer.data)
-#         return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
-#
-#     # 上传用户领域
-#     # PUT /field/{userID}
-#     def update(self, request, *args, **kwargs):
-#         #data = dict()
-#         #data['pk'] = int(kwargs['pk'])
-#         #data['field'] = request.data['field']
-#         #return JsonResponse(request.data['field'], safe=False)
-#         #serializer = self.get_serializer(data=request.data)
-#         #serializer.is_valid(raise_exception=True)
-#         #self.perform_create(serializer)
-#         #headers = self.get_success_headers(serializer.data)
-#         #return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
-#
-#         Tags.objects.update_or_create(userID__exact=kwargs['pk'])
-#         tag = Tags.objects.get(userID__exact=kwargs['pk'])
-#         tag.field.clear()
-#         for i in request.data['field']:
-#             tag.field.add(Fields.objects.get(field__exact=i).fieldID)
-#         return JsonResponse("OK", safe=False, status=status.HTTP_201_CREATED)
 
 
+# 返回推荐专利
 
+
+class FieldViewSet(CreateModelMixin,
+                         ListModelMixin,
+                         UpdateModelMixin,
+                         RetrieveModelMixin,
+                         viewsets.GenericViewSet):
+    def get_queryset(self):
+        if self.action == 'get' or self.action == 'list':
+            return Fields.objects.all()
+        elif self.action == 'post':
+            return Tags.objects.all()
+        return  Tags.objects.all()
+
+    def get_serializer_class(self, *args, **kwargs):
+        if self.action == 'get' or self.action == 'list':
+            return FieldsSerializer
+        elif self.action == 'update' or self.action == 'partial_update' or self.action == 'post' \
+                or self.action == 'read':
+            return TagSerializer
+        return  TagSerializer
+
+    # 查看所有符合输入的关键词
+    # GET /field/?keywords=xxx
+    def list(self, request, *args, **kwargs):
+        queryset = Fields.objects.filter(field__icontains=request.GET.get('keywords', ''))[:500]
+        queryset = self.filter_queryset(queryset)
+        selectedfield = []
+        for i in queryset:
+            selectedfield.append({"field":i.field, "fieldID":i.fieldID})
+        questlist = dict()
+        questlist['tag'] = selectedfield
+        return JsonResponse(questlist)
+
+    # 上传用户领域
+    # POST /field/
+    # params: {
+    #       userID : xxx
+    #       field: [
+    #           aa,bb,cc
+    #       ]
+    # }
+    def create(self, request, *args, **kwargs):
+        #return JsonResponse(request.data, safe=False)
+        userid = UserProfile.objects.filter(userID__exact=request.data.get('params').get('userID'))[0]
+        for i in request.data.get('params').get("field"):
+            field = Fields.objects.filter(fieldID__exact=i.get('fieldID'))[0]
+            if Tags.objects.filter(userID__exact=request.data.get('params').get('userID'), fieldID__exact=field.id).exists():
+                continue
+            tag = Tags()
+            tag.userID = userid
+            tag.fieldID = field
+            tag.save()
+        return JsonResponse("OK", safe=False, status=status.HTTP_201_CREATED)
+
+    # def create(self, request, *args, **kwargs):
+    #     serializer = self.get_serializer(data=request.data)
+    #     serializer.is_valid(raise_exception=True)
+    #     self.perform_create(serializer)
+    #     headers = self.get_success_headers(serializer.data)
+    #     return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
 
 

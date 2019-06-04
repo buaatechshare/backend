@@ -20,6 +20,9 @@ from rest_framework.routers import DefaultRouter
 from rest_framework.documentation import include_docs_urls
 
 from users.views import UserViewSet,MessageViewSet,ExpertCheckViewSet,FollowViewSet
+from users.views import get_user_fuzzy_by_name, FieldViewSet
+from resources.views import CollectionViewSet,CommentViewSet
+from resources.views import paperDetail,patentDetail,searchPapers,searchPatents, get_rec_paper, get_rec_patent, get_professors_by_name, get_expert_by_esID
 from resources.views import PaperCheckViewSet,CollectionViewSet,CommentViewSet,searchPapers,searchPatents
 from resources.views import PatentView,PaperView
 from users.views import get_user_fuzzy_by_name,MyJSONWebTokenAPIView
@@ -50,7 +53,7 @@ router.register('paperCheck',PaperCheckViewSet,base_name='paperCheck')
 # router.register('papers',PaperViewSet,base_name='paper')
 
 #用户领域
-#router.register('field', FieldViewSet, base_name='fields')
+router.register('field', FieldViewSet, base_name='fields')
 
 urlpatterns = [
     path('admin/', admin.site.urls),
@@ -66,5 +69,9 @@ urlpatterns = [
     path('patentDetail/<str:patentID>/',PatentView.as_view()),
     path('search/papers/',searchPapers),
     path('search/patents/',searchPatents),
-    path('receiver/<str:userName>/', get_user_fuzzy_by_name)
+    path('receiver/<str:userName>/', get_user_fuzzy_by_name),
+    path('papersRec/<str:userID>/', get_rec_paper),
+    path('patentsRec/<str:userID>/', get_rec_patent),
+    path('search/professors/', get_professors_by_name),
+    path('professor/<str:esExpertID>', get_expert_by_esID)
 ]

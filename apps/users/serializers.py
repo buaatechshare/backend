@@ -8,7 +8,7 @@ from rest_framework.validators import UniqueValidator,UniqueTogetherValidator
 # third-party packges
 
 # my-own packages
-from .models import UserProfile,Message,Follow,ExpertCheckForm,ExpertProfile, Fields
+from .models import UserProfile,Message,Follow,ExpertCheckForm,ExpertProfile, Fields, Tags
 
 class UserDetailSerializer(serializers.ModelSerializer):
     class Meta:
@@ -117,8 +117,20 @@ class FieldsSerializer(serializers.ModelSerializer):
         model = Fields
         fields = '__all__'
 
-# class TagSerializer(serializers.ModelSerializer):
-#     #userID = serializers.IntegerField(read_only=True)
-#     class Meta:
-#         model = Tags
-#         fields = '__all__'
+
+class TagSerializer(serializers.ModelSerializer):
+    userID = serializers.IntegerField()
+    field = serializers.IntegerField()
+
+    class Meta:
+        model = Tags
+        fields = ('userID', 'field')
+
+    #def create(self, validated_data):
+    #    tag = super().create(validated_data)
+    #    userID = validated_data.get('userID')
+    #    field = validated_data.get('field')
+    #    tag.userID = userID
+    #    tag.field = field
+    #    tag.save()
+    #    return tag

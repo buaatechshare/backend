@@ -141,27 +141,30 @@ class ExpertCheckForm(models.Model):
 
 
 class Fields(models.Model):
-    fieldID = models.AutoField(primary_key=True, verbose_name='领域编号')
-    field = models.CharField(max_length=100, verbose_name='领域名称')
+    id = models.AutoField(primary_key=True, verbose_name='领域编号')
+    field = models.CharField(max_length=100, unique=True, verbose_name='领域名称')
+    fieldID = models.CharField(max_length=100, verbose_name='领域编号')
+    type = models.CharField(max_length=20, verbose_name='资源类型')
 
     class Meta:
         verbose_name = '领域名称表单'
         verbose_name_plural = verbose_name
 
     def __str__(self):
-        return self.field
+        return self.fieldID
 
 
-# class Tags(models.Model):
-#     userID = models.ForeignKey(UserProfile, to_field='userID', on_delete=models.CASCADE, verbose_name='用户ID')
-#     field = models.ManyToManyField(Fields)
-#
-#     class Meta:
-#         verbose_name = '用户领域表单'
-#         verbose_name_plural = verbose_name
-#
-#     def __str__(self):
-#         return self.userID
+class Tags(models.Model):
+    id = models.AutoField(primary_key=True, verbose_name="用户领域ID")
+    userID = models.ForeignKey(UserProfile, to_field='userID', on_delete=models.CASCADE, verbose_name='用户ID')
+    fieldID = models.ForeignKey(Fields, to_field='id', on_delete=models.CASCADE, verbose_name='用户领域')
+
+    class Meta:
+        verbose_name = '用户领域表单'
+        verbose_name_plural = verbose_name
+
+    def __str__(self):
+        return self.tagID
 
 
 #class UserField(models.Model):
