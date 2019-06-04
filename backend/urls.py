@@ -22,7 +22,7 @@ from rest_framework.documentation import include_docs_urls
 from users.views import UserViewSet,MessageViewSet,ExpertCheckViewSet,FollowViewSet
 from users.views import get_user_fuzzy_by_name, FieldViewSet
 from resources.views import CollectionViewSet,CommentViewSet
-from resources.views import paperDetail,patentDetail,searchPapers,searchPatents, get_rec_paper, get_rec_patent, get_professors_by_name, get_expert_by_esID
+from resources.views import searchPapers,searchPatents, get_rec_paper, get_rec_patent, get_professors_by_name, get_expert_by_esID
 from resources.views import PaperCheckViewSet,CollectionViewSet,CommentViewSet,searchPapers,searchPatents
 from resources.views import PatentView,PaperView
 from users.views import get_user_fuzzy_by_name,MyJSONWebTokenAPIView

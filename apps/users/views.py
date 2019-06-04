@@ -19,8 +19,8 @@ from resources.es_connect import es
 # my-own packages
 from .serializers import UserRegSerializer,MessageGetSerializer,MessagePostSerializer,FollowGetSerializer,FollowPostSerializer,UserDetailSerializer,UserUpdateSerializer
 from .serializers import ExpertApplySerializer,ExpertCheckSerializer
-from .serializers import FieldsSerializer
-from .models import UserProfile,Message,Follow,ExpertCheckForm,ExpertProfile, Fields
+from .serializers import FieldsSerializer,TagSerializer
+from .models import Tags,UserProfile,Message,Follow,ExpertCheckForm,ExpertProfile, Fields
 from backend.settings import EXPERT_OFFSET
 
 # Create your views here.
