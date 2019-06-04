@@ -536,7 +536,7 @@ def get_professors_by_name(requset, *args, **kwargs):
     pagenum = int(requset.GET.get('page',1))
     pagesize = int(requset.GET.get('size',10))
     ret = es.search(
-        index="experts",
+        index="authors",
         body={
             "query": {
                     "match":{
