@@ -236,7 +236,7 @@ def get_user_fuzzy_by_name(request, userName):
     fuzzy_name_set = UserProfile.objects.filter(name__istartswith=userName)[:10]
     fuzzy_name = []
     for i in fuzzy_name_set:
-        fuzzy_name.append(i.name)
+        fuzzy_name.append(i.name, i.userID)
     name_dict = dict()
     name_dict['userName'] = fuzzy_name
     return JsonResponse(name_dict, safe=False)
@@ -268,25 +268,31 @@ class FieldViewSet(CreateModelMixin,
         return  TagSerializer
 
     # 查看所有符合输入的关键词
-    # GET /field ?keywords=
+    # GET /field/?keywords=xxx
     def list(self, request, *args, **kwargs):
         queryset = Fields.objects.filter(field__icontains=request.GET.get('keywords', ''))[:500]
         queryset = self.filter_queryset(queryset)
         selectedfield = []
         for i in queryset:
-            selectedfield.append(i.field)
+            selectedfield.append({"field":i.field, "fieldID":i.fieldID})
         questlist = dict()
         questlist['tag'] = selectedfield
         return JsonResponse(questlist)
 
     # 上传用户领域
     # POST /field/
+    # params: {
+    #       userID : xxx
+    #       field: [
+    #           aa,bb,cc
+    #       ]
+    # }
     def create(self, request, *args, **kwargs):
         #return JsonResponse(request.data, safe=False)
-        userid = UserProfile.objects.filter(userID__exact=request.data['userID'])[0]
-        for i in request.data["field"]:
-            field = Fields.objects.filter(field__exact=i)[0]
-            if Tags.objects.filter(userID__exact=request.data['userID'], fieldID__exact=field.id).exists():
+        userid = UserProfile.objects.filter(userID__exact=request.data.get('params').get('userID'))[0]
+        for i in request.data.get('params').get("field"):
+            field = Fields.objects.filter(fieldID__exact=i.get('fieldID'))[0]
+            if Tags.objects.filter(userID__exact=request.data.get('params').get('userID'), fieldID__exact=field.id).exists():
                 continue
             tag = Tags()
             tag.userID = userid
@@ -294,6 +300,11 @@ class FieldViewSet(CreateModelMixin,
             tag.save()
         return JsonResponse("OK", safe=False, status=status.HTTP_201_CREATED)
 
-
+    # def create(self, request, *args, **kwargs):
+    #     serializer = self.get_serializer(data=request.data)
+    #     serializer.is_valid(raise_exception=True)
+    #     self.perform_create(serializer)
+    #     headers = self.get_success_headers(serializer.data)
+    #     return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
 
 

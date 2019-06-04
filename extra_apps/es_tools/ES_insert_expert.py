@@ -16,7 +16,7 @@ files= os.listdir(path)
 num_id = 0
 try:
     for filename in files:
-        if filename == 'mag_authors_10.txt':
+        if filename == 'testinsertexpert.txt':
             with open(filename,'r') as fin:
                 s = time.time()
                 actions = []

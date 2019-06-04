@@ -22,6 +22,7 @@ from users.models import Fields, Tags, ExpertProfile
 from .models import Comment,Collection
 from .serializers import CommentPostSerializer,CommentGetSerializer,CollectionPostSerializer
 from .es_connect import es
+import OAG_APIs.get_Methods as esget
 
 #GET /paperDetail/{paperID}/
 def paperDetail(request,paperID):
@@ -206,41 +207,57 @@ class CollectionViewSet(CreateModelMixin,
 # 返回推荐论文
 # /papersRec/{userID}
 def get_rec_paper(request, userID):
-    pagenum = int(request.GET['pageNumber'])
-    pagesize = int(request.GET['pageSize'])
+    pagenum = int(request.GET.get('pageNumber',1))
+    pagesize = int(request.GET.get('pageSize', 10))
     userid = str(userID)
     arr = []
 
     if int(userid) == 0:
         seed(datetime.now())
         con = Fields.objects.latest('id').id
-        rand_ids = sample(range(1, con), 100)
+        rand_ids = sample(range(1, con), 40)
         get_field = Fields.objects.filter(id__in=rand_ids)
         for i in get_field:
             if i.type == "patent":
                 continue
-            arr.append({"match": {"fos": i.field}})
+            arr.append(i.fieldID)
+            arr = arr[:10]
         #return JsonResponse(arr , safe=False)
     else:
         get_field = Tags.objects.filter(userID__exact=userid)
         for i in get_field:
             if i.fieldID.type == "patent":
                 continue
-            arr.append({"match": {"fos": i.fieldID.field}})
-    ret = es.search(
-        index="papers",
-        body={
-            "query": {
-                "bool": {
-                    "minimum_should_match":1,
-                    "should": arr
+            arr.append(i.fieldID.fieldID)
+    paper = esget.get_certain_fos_paper(arr, 10)
+    #return JsonResponse(paper , safe=False)
+    rec_list = []
+    for i in paper:
+        for j in i:
+            single_get = es.search(
+                index="papers",
+                body={
+                    "query": {
+                        "term": {
+                            "_id": j
+                        }
+                    }
                 }
-            },
-            "size": pagesize,
-            "from": (pagenum-1)*pagesize,
-        }
-    )
-    ret = ret['hits']['hits']
+            )
+            if len(single_get['hits']['hits']) == 0:
+                continue
+            single_get = single_get['hits']['hits'][0]
+            item = dict()
+            item['type'] = single_get['_type']
+            item['id'] = single_get['_id']
+            item['citation'] = esget.get_Reference(single_get['_id'])
+            item['paperName'] = single_get['_source'].get('title')
+            item['author'] = single_get['_source'].get('authors')
+            item['abstract'] = esget.get_abstract(single_get['_id'])
+            item['fos'] = esget.get_FoS(single_get['_id'])
+            rec_list.append(item)
+
+    '''
     paper_list = []
     for item in ret:
         paper_item = dict()
@@ -252,17 +269,19 @@ def get_rec_paper(request, userID):
         paper_item['abstract'] = item['_source'].get('abstract')
         #paper_item['fos'] = item['_source'].get('fos')
         paper_list.append(paper_item)
+    '''
+    shuffle(rec_list)
     ret = dict()
-    ret['count'] = len(paper_list)
-    ret['results'] = paper_list
+    ret['count'] = len(rec_list)
+    ret['results'] = rec_list[(pagenum-1)*pagesize:(pagenum-1)*pagesize+10]
     return JsonResponse(ret, safe=False)
 
 
 # 返回推荐专利
 # /patentsRec/{userID}
 def get_rec_patent(request, userID):
-    pagenum = int(request.GET['pageNumber'])
-    pagesize = int(request.GET['pageSize'])
+    pagenum = int(request.GET.get('pageNumber', 1))
+    pagesize = int(request.GET.get('pageSize', 10))
     userid = userID
     arr = []
     if int(userid) == 0:
@@ -281,6 +300,12 @@ def get_rec_patent(request, userID):
             if i.fieldID.type == "paper":
                 continue
             arr.append({"match_phrase_prefix": {"Patent.IC": {"query":i.fieldID.fieldID, "max_expansions": 10}}})
+    if len(arr) == 0:
+        iret = dict()
+        iret['count'] = 0
+        iret['results'] = []
+        # ret['test'] = arr
+        return JsonResponse(iret, safe=False)
     ret = es.search(
         index="patents",
         body={
@@ -294,6 +319,7 @@ def get_rec_patent(request, userID):
             "from": (pagenum - 1) * pagesize,
         }
     )
+    count = ret['hits']['total'].get('value')
     ret = ret['hits']['hits']
     paper_list = []
     con = len(ret)
@@ -303,17 +329,21 @@ def get_rec_patent(request, userID):
         paper_item['patentName'] = item['_source']['Patent'].get('TI')
         paper_item['summary'] = item['_source']['Patent'].get('AB')
         paper_item['resourceID'] = item['_id']
+        paper_item['IC'] = item['_source']['Patent'].get('IC')
         paper_list.append(paper_item)
     ret = dict()
-    ret['count'] = con
+    ret['count'] = count
     ret['results'] = paper_list
+    #ret['test'] = arr
     return JsonResponse(ret, safe=False)
 
 
 # 查找专家
 # /search/professors
 def get_professors_by_name(requset, *args, **kwargs):
-    keywords = requset.GET['keywords']
+    keywords = requset.GET.get('keywords')
+    pagenum = int(requset.GET.get('page',1))
+    pagesize = int(requset.GET.get('size',10))
     ret = es.search(
         index="experts",
         body={
@@ -321,11 +351,14 @@ def get_professors_by_name(requset, *args, **kwargs):
                     "match":{
                         "name": keywords
                     }
-                }
-            }
+                },
+            "size": pagesize,
+            "from": (pagenum - 1) * pagesize,
+        }
     )
+    count = ret['hits']['total'].get('value')
     ret = ret['hits']['hits']
-    list = []
+    paper_list = []
     for i in ret:
         item = dict()
         item['name'] = i['_source'].get('name')
@@ -336,25 +369,26 @@ def get_professors_by_name(requset, *args, **kwargs):
         item['id'] = i['_id']
         #return JsonResponse(i['_source']['pubs'], safe=False)
         paper = []
+
         for pap_id in i['_source']['pubs']:
             paper_get = es.search(
                 index="papers",
                 body={
                     "query":{
                         "term":{
-                            "authors.id": pap_id.get('i')
+                            "_id": pap_id.get('i')
                         }
                     }
                 }
             )
             paper_get = paper_get['hits']['hits']
             for j in paper_get:
-                paper.append(i['_source'].get('title'))
+                paper.append(j['_source'].get('title'))
         item['papers'] = paper
-        list.append(item)
+        paper_list.append(item)
     ret = dict()
-    ret['count'] = len(list)
-    ret['results'] = list
+    ret['count'] = count
+    ret['results'] = paper_list
 
     return JsonResponse(ret, safe=False)
 
@@ -366,7 +400,7 @@ def get_professors_by_name(requset, *args, **kwargs):
 '''
 
 # 按id查找专家
-# /professors/{esExpertID}
+# /professor/{esExpertID}
 def get_expert_by_esID(request, esExpertID):
     id = esExpertID
     ret = es.search(
