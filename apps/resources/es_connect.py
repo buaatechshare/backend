@@ -1,3 +1,4 @@
 from elasticsearch import Elasticsearch
 
-es = Elasticsearch("127.0.0.1:9200")
+es = Elasticsearch("10.136.70.232:9200",timeout=60)
+

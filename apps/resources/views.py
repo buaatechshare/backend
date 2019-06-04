@@ -4,16 +4,17 @@ from datetime import datetime
 # django&restframework packges
 from rest_framework.mixins import CreateModelMixin,RetrieveModelMixin,ListModelMixin,UpdateModelMixin,DestroyModelMixin
 from rest_framework import viewsets,status
+from rest_framework.status import HTTP_404_NOT_FOUND,HTTP_500_INTERNAL_SERVER_ERROR
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from django.http import JsonResponse,HttpResponse
-from django.core.paginator import Paginator,PageNotAnInteger,EmptyPage
-from django.core import serializers
+from django.http import JsonResponse
+
 import logging
 from django.contrib.auth.models import AnonymousUser
 
+
 # third-party packges
-from elasticsearch import Elasticsearch
+from elasticsearch import helpers
 
 # my-own packages
 from users.views import StandardResultsSetPagination
@@ -21,7 +22,8 @@ from .models import Comment,Collection,PaperCheckForm
 from .serializers import CommentPostSerializer,CommentGetSerializer,CollectionPostSerializer
 from .serializers import PaperCheckPostSerializer,PaperGetSerializer,PatentGetSerializer,PaperCheckFormSerializer
 from .es_connect import es
-from OAG_APIs.get_Methods import get_Reference,get_abstract,get_FoS
+from OAG_APIs.get_Methods import get_paper_details
+from backend.settings import PAPER_OFFSET
 
 logger = logging.getLogger()
 
@@ -75,6 +77,27 @@ logger = logging.getLogger()
 #     patent_item = ret['_source']
 #     return JsonResponse(patent_item)
 
+def get_full_paper(paperID):
+    ret = es.get(index='papers',id=paperID)
+    paper = ret['_source']
+    extra_data = get_paper_details(paperID)
+    if extra_data is not None:
+        for item in extra_data:
+            paper[item] = extra_data[item]
+
+    if paper.get('references') is not None:
+        ref = list()
+        for item in paper['references']:
+            try:
+                ret = es.get(index='papers', id=item)
+            except Exception:
+                continue
+            ref.append((item, ret['_source'].get('title')))
+        paper['references'] = ref
+    return paper
+
+
+
 class PaperView(APIView):
     # GET /paperDetail/{paperID}/
     def get(self,request,paperID):
@@ -86,48 +109,10 @@ class PaperView(APIView):
             'userID:%s resType:paper resID:%s' % \
             (user,paperID)
         )
-        ret = es.get(
-            index='papers',
-            id=paperID,
-        )
-        paper = ret['_source']
-        if paper.get('references') is not None:
-            ref = list()
-            for item in paper['references']:
-                try:
-                    ret = es.get(index='papers',id=item)
-                except Exception:
-                    continue
-                ref.append((item,ret['_source'].get('title')))
-            paper['references'] = ref
-
-        return JsonResponse(paper)
-
-# GET /paperDetail/{paperID}/
-    def get(self,request,paperID):
-        if isinstance(request.user,AnonymousUser):
-            user = '未登录用户'
-        else:
-            user = request.user.userID
-        logger.info(
-            'userID:%s resType:paper resID:%s' % \
-            (user,paperID)
-        )
-        ret = es.get(
-            index='papers',
-            id=paperID,
-        )
-        paper = ret['_source']
-        if paper.get('references') is not None:
-            ref = list()
-            for item in paper['references']:
-                try:
-                    ret = es.get(index='papers',id=item)
-                except Exception:
-                    continue
-                ref.append((item,ret['_source'].get('title')))
-            paper['references'] = ref
-
+        try:
+            paper = get_full_paper(paperID)
+        except:
+            return Response(status=HTTP_404_NOT_FOUND)
         return JsonResponse(paper)
 
 class PatentView(APIView):
@@ -140,10 +125,13 @@ class PatentView(APIView):
             'userID:%s resType:patent resID:%s' % \
             (user,patentID)
         )
-        ret = es.get(
-            index='patents',
-            id=patentID,
-        )
+        try:
+            ret = es.get(
+                index='patents',
+                id=patentID,
+            )
+        except:
+            return Response(status=HTTP_404_NOT_FOUND)
         # patent = ret['_source']['Patent']
         patent = ret['_source']
         return JsonResponse(patent,safe=False)
@@ -172,30 +160,15 @@ def searchPapers(request):
     )
     response = dict()
     response['count'] = ret['hits']['total']['value']
-    # 1.将所有内容直接返回
-    # paper_list = ret['hits']['hits']
-    # 2.将结果整理后返回
     ret = ret['hits']['hits']
     paper_list = []
     for item in ret:
-        paper_item = dict()
-        paper_item['type'] = item['_type']
-        paper_item['id'] = item['_id']
-        paper_item['citation'] = item['_source'].get('n_citaion')
-        paper_item['author'] = item['_source'].get('authors')
-        paper_item['paperName'] = item['_source'].get('title')
-        paper_item['abstract'] = item['_source'].get('abstract')
-        paper_list.append(paper_item)
-
-    # paginator = Paginator(paper_list,pageSize)
-    # try:
-    #     papers = paginator.page(page)
-    # except PageNotAnInteger:
-    #     papers = paginator.page(pageSize)
-    # except EmptyPage:
-    #     papers = paginator.page(paginator.num_pages)
-    # papers = papers.object_list
-
+        try:
+            paper_item = get_full_paper(item['_id'])
+            paper_item['resourceID'] = paper_item['id']
+            paper_list.append(paper_item)
+        except:
+            continue
     response['results'] = paper_list
     return JsonResponse(response,safe=False)
 
@@ -298,14 +271,21 @@ class CollectionViewSet(CreateModelMixin,
                 queryset.append(item)
             #This item is paper
             elif len(item.resourceID)<20 and resType==1:
-                ret = es.get(index='papers',id=item.resourceID)
-                item = dict()
-                item['paperID'] = ret['_id']
-                ret = ret['_source']
-                item['paperName'] = ret.get('title')
-                item['abstract'] = ret.get('abstract')
-                item['author'] = ret.get('authors')
-                item['authorID'] = ret.get('authorID')
+                try:
+                    paper = get_full_paper(item.resourceID)
+                    item = dict()
+                    item['paperID'] = paper.get('id')
+                    item['paperName'] = paper.get('title')
+                    item['abstract'] = paper.get('abstract')
+                    author_list = []
+                    authorID_list = []
+                    for author in paper.get('authors'):
+                        author_list.append(author.get('name'))
+                        authorID_list.append(author.get('id'))
+                    item['author'] = author_list
+                    item['authorID'] = authorID_list
+                except Exception:
+                    continue
                 queryset.append(item)
 
         page = self.paginate_queryset(queryset)
@@ -355,18 +335,46 @@ class PaperCheckViewSet(CreateModelMixin,
         self.perform_update(serializer)
 
         if serializer.validated_data.get('isPass'):
+            formID = serializer.validated_data.get('id')
             user = serializer.validated_data.get('userID')
             title = serializer.validated_data.get('title')
             author = serializer.validated_data.get('author')
             doi = serializer.validated_data.get('doi')
             abstract = serializer.validated_data.get('abstract')
-            file = serializer.validated_data.get('')
+            file = serializer.validated_data.get('file')
 
             paperEntity = dict()
-            paperID = int()
+            paperID = str(int(formID)+PAPER_OFFSET)
+            paperEntity['id'] = paperID
+            paperEntity['title'] = title
+            paperEntity['authors'] = [
+                {
+                    "name":user.realName,
+                    "id":user.expertID
+                }
+            ]
+            paperEntity['abstract'] = abstract
+            paperEntity['url'] = file
+            paperEntity['doi'] = doi
 
-            pass
-        
+            #向es.papers插入数据
+            try:
+                action = {
+                    '_index':'papers',
+                    '_type':'paper',
+                    '_id': paperID,
+                    '_source': paperEntity
+                }
+                a = helpers.bulk(es,[action])
+            except Exception:
+                return Response(status=HTTP_500_INTERNAL_SERVER_ERROR)
+
+            #更新es.authors
+            expert = es.get(index='authors',id=user.expertID)
+            expert = expert['_source']
+            if expert.get('pubs'):
+                expert['pubs'].append({"i":paperID,"r":0})
+
         if getattr(instance, '_prefetched_objects_cache', None):
             # If 'prefetch_related' has been applied to a queryset, we need to
             # forcibly invalidate the prefetch cache on the instance.

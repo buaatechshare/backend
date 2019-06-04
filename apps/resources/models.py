@@ -20,7 +20,7 @@ class Comment(models.Model):
     resourceID = models.CharField(max_length=255)
     content = models.TextField()
     rate = models.IntegerField()
-    add_time = models.DateTimeField(default=datetime.now,)
+    add_time = models.DateTimeField(default=datetime.now)
 
 class Collection(models.Model):
     """
