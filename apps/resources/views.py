@@ -29,7 +29,7 @@ from .models import Comment,Collection,PaperCheckForm
 from .serializers import CommentPostSerializer,CommentGetSerializer,CollectionPostSerializer
 from .serializers import PaperCheckPostSerializer,PaperGetSerializer,PatentGetSerializer,PaperCheckFormSerializer
 from .es_connect import es
-from OAG_APIs.get_Methods import get_paper_details
+from OAG_APIs.get_Methods import get_paper_details,get_paper_details_batch
 from backend.settings import PAPER_OFFSET
 
 logger = logging.getLogger()
@@ -86,9 +86,16 @@ import OAG_APIs.get_Methods as esget
 #     return JsonResponse(patent_item)
 
 def get_full_paper(paperID):
+    import time
+    start = time.time()
     ret = es.get(index='papers',id=paperID)
+    end = time.time()
+    logger.info("es single search time{}".format(end-start))
     paper = ret['_source']
+    start = time.time()
     extra_data = get_paper_details(paperID)
+    end = time.time()
+    logger.info("web single search time{}".format(end-start))
     if extra_data is not None:
         for item in extra_data:
             paper[item] = extra_data[item]
@@ -104,7 +111,36 @@ def get_full_paper(paperID):
         paper['references'] = ref
     return paper
 
-
+def es_get_papers_batch(p_ids):
+    papers = []
+    for id in p_ids:
+        try:
+            papers.append(es.get(index='papers', id=id)['_source'])
+        except:
+            papers.append({})
+    return papers
+def get_full_paper_batch(items):
+    item_ids = []
+    for item in items:
+        item_ids.append(item['_id'])
+    extra_datas = get_paper_details_batch(item_ids)
+    es_datas = es_get_papers_batch(item_ids)
+    paper_list = []
+    for paper,extra_data in zip(es_datas,extra_datas):
+        if extra_data is not None:
+            for item in extra_data:
+                paper[item] = extra_data[item]
+        if paper.get('references') is not None:
+            ref = list()
+            for item in paper['references']:
+                try:
+                    ret = es.get(index='papers', id=item)
+                except Exception:
+                    continue
+                ref.append((item, ret['_source'].get('title')))
+            paper['references'] = ref
+        paper_list.append(paper)
+    return paper_list
 
 class PaperView(APIView):
     # GET /paperDetail/{paperID}/
@@ -170,13 +206,18 @@ def searchPapers(request):
     response['count'] = ret['hits']['total']['value']
     ret = ret['hits']['hits']
     paper_list = []
-    for item in ret:
-        try:
-            paper_item = get_full_paper(item['_id'])
-            paper_item['resourceID'] = paper_item['id']
-            paper_list.append(paper_item)
-        except:
-            continue
+    import time
+    start = time.time()
+    paper_list = get_full_paper_batch(ret)
+    # for item in ret:
+    #     try:
+    #         paper_item = get_full_paper(item['_id'])
+    #         paper_item['resourceID'] = paper_item['id']
+    #         paper_list.append(paper_item)
+    #     except:
+    #         continue
+    end = time.time()
+    logger.info("search time{}".format(end- start))
     response['results'] = paper_list
     return JsonResponse(response,safe=False)
 
@@ -268,7 +309,10 @@ class CollectionViewSet(CreateModelMixin,
         for item in collectionSet:
             #This item is patent:
             if len(item.resourceID)>=20 and resType==2:
-                ret = es.get(index='patents',id=item.resourceID)
+                try:
+                    ret = es.get(index='patents',id=item.resourceID)
+                except Exception:
+                    continue
                 item = dict()
                 item['patentID'] = ret['_id']
                 # ret = ret['_source']['Patent']
@@ -420,34 +464,37 @@ def get_rec_paper(request, userID):
             if i.fieldID.type == "patent":
                 continue
             arr.append(i.fieldID.fieldID)
-    paper = esget.get_certain_fos_paper(arr, 10)
+    paper_ids = esget.get_certain_fos_paper_batch(arr, 10)
     #return JsonResponse(paper , safe=False)
-    rec_list = []
-    for i in paper:
-        for j in i:
-            single_get = es.search(
-                index="papers",
-                body={
-                    "query": {
-                        "term": {
-                            "_id": j
-                        }
-                    }
-                }
-            )
-            if len(single_get['hits']['hits']) == 0:
-                continue
-            single_get = single_get['hits']['hits'][0]
-            item = dict()
-            item['type'] = single_get['_type']
-            item['id'] = single_get['_id']
-            item['citation'] = esget.get_Reference(single_get['_id'])
-            item['paperName'] = single_get['_source'].get('title')
-            item['author'] = single_get['_source'].get('authors')
-            item['abstract'] = esget.get_abstract(single_get['_id'])
-            item['fos'] = esget.get_FoS(single_get['_id'])
-            rec_list.append(item)
 
+    es_list = []
+    paper_details = get_paper_details_batch(paper_ids)
+    for id in paper_ids:
+        try:
+            single_get = es.get(index="papers",id=id)
+        except:
+            single_get = None
+        if single_get:
+            single_get=single_get['_source']
+        else:
+            single_get = {}
+        item = dict()
+        item['type'] = 'paper'
+        item['id'] = id
+        # item['citation'] = esget.get_Reference(single_get['_id'])
+        item['paperName'] = single_get.get('title')
+        item['author'] = single_get.get('authors')
+        # item['abstract'] = esget.get_abstract(single_get['_id'])
+        # item['fos'] = esget.get_FoS(single_get['_id'])
+        es_list.append(item)
+    rec_list = []
+    for es_item,detail in zip(es_list,paper_details):
+        if not es_item['paperName']:
+            continue
+        es_item['references'] = detail['references']
+        es_item['fos'] = detail['fos']
+        es_item['abstract'] = detail['abstract']
+        rec_list.append(es_item)
     '''
     paper_list = []
     for item in ret:
@@ -483,14 +530,14 @@ def get_rec_patent(request, userID):
         for i in get_field:
             if i.type == "paper":
                 continue
-            arr.append({"match_phrase_prefix": {"Patent.IC": {"query":i.fieldID, "max_expansions": 10}}})
+            arr.append({"match_phrase_prefix": {"IC": {"query":i.fieldID, "max_expansions": 10}}})
         #return JsonResponse(arr , safe=False)
     else:
         get_field = Tags.objects.filter(userID__exact=userid)
         for i in get_field:
             if i.fieldID.type == "paper":
                 continue
-            arr.append({"match_phrase_prefix": {"Patent.IC": {"query":i.fieldID.fieldID, "max_expansions": 10}}})
+            arr.append({"match_phrase_prefix": {"IC": {"query":i.fieldID.fieldID, "max_expansions": 10}}})
     if len(arr) == 0:
         iret = dict()
         iret['count'] = 0
@@ -516,11 +563,11 @@ def get_rec_patent(request, userID):
     con = len(ret)
     for item in ret:
         paper_item = dict()
-        paper_item['rightholder'] = item['_source']['Patent'].get('IN')
-        paper_item['patentName'] = item['_source']['Patent'].get('TI')
-        paper_item['summary'] = item['_source']['Patent'].get('AB')
+        paper_item['rightholder'] = item['_source'].get('IN')
+        paper_item['patentName'] = item['_source'].get('TI')
+        paper_item['summary'] = item['_source'].get('AB')
         paper_item['resourceID'] = item['_id']
-        paper_item['IC'] = item['_source']['Patent'].get('IC')
+        paper_item['IC'] = item['_source'].get('IC')
         paper_list.append(paper_item)
     ret = dict()
     ret['count'] = count

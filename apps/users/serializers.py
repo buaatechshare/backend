@@ -13,7 +13,7 @@ from .models import UserProfile,Message,Follow,ExpertCheckForm,ExpertProfile, Fi
 class UserDetailSerializer(serializers.ModelSerializer):
     class Meta:
         model = UserProfile
-        fields = ('name','phone','email','user_add_time')
+        fields = ('name','phone','email','user_add_time','isExpert')
 
 class UserUpdateSerializer(serializers.ModelSerializer):
     def update(self, instance, validated_data):
