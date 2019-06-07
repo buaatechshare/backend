@@ -127,6 +127,8 @@ def get_full_paper_batch(items):
     es_datas = es_get_papers_batch(item_ids)
     paper_list = []
     for paper,extra_data in zip(es_datas,extra_datas):
+        if not paper.get('title'):
+            continue
         if extra_data is not None:
             for item in extra_data:
                 paper[item] = extra_data[item]
@@ -139,6 +141,8 @@ def get_full_paper_batch(items):
                     continue
                 ref.append((item, ret['_source'].get('title')))
             paper['references'] = ref
+        if paper.get('venue'):
+            paper.pop('venue')
         paper_list.append(paper)
     return paper_list
 
@@ -413,12 +417,12 @@ class PaperCheckViewSet(CreateModelMixin,
             try:
                 action = {
                     '_index':'papers',
-                    '_type':'paper',
+                    '_type':'_doc',
                     '_id': paperID,
                     '_source': paperEntity
                 }
                 a = helpers.bulk(es,[action])
-            except Exception:
+            except Exception as exc:
                 return Response(status=HTTP_500_INTERNAL_SERVER_ERROR)
 
             #更新es.authors
@@ -464,7 +468,7 @@ def get_rec_paper(request, userID):
             if i.fieldID.type == "patent":
                 continue
             arr.append(i.fieldID.fieldID)
-    paper_ids = esget.get_certain_fos_paper_batch(arr, 10)
+    paper_ids = esget.get_certain_fos_paper_batch(arr, 50)
     #return JsonResponse(paper , safe=False)
 
     es_list = []

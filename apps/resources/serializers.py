@@ -55,7 +55,7 @@ class PaperCheckPostSerializer(serializers.ModelSerializer):
         fields = ('userID','title','author','doi','abstract','file','add_time')
 
 class PaperCheckFormSerializer(serializers.ModelSerializer):
-    #id = serializers.IntegerField(read_only=True)
+    id = serializers.IntegerField(read_only=False)
     add_time = serializers.DateTimeField(read_only=True)
     
     class Meta:
