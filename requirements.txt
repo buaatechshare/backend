@@ -35,7 +35,7 @@ odfpy==1.4.0
 olefile==0.46
 openpyxl==2.6.2
 Pillow==4.2.1
-PyJWT==1.7.1
+PyJWT==2.4.0
 pytest-runner==4.4
 python-dateutil==2.8.0
 pytz==2019.1
